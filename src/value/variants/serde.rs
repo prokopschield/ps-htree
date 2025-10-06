@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use ps_hkey::Store;
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::HtreeValue;
@@ -15,7 +14,7 @@ where
     type PackError = ciborium::ser::Error<std::io::Error>;
     type UnpackError = ciborium::de::Error<std::io::Error>;
 
-    fn pack(&self, _: impl Store) -> Result<bytes::Bytes, Self::PackError> {
+    fn pack<S>(&self, _store: &S) -> Result<bytes::Bytes, Self::PackError> {
         let mut bytes = Vec::new();
 
         ciborium::into_writer(&self.0, &mut bytes)?;
@@ -23,7 +22,7 @@ where
         Ok(Bytes::from_owner(bytes))
     }
 
-    fn unpack(bytes: Bytes, _: impl Store) -> Result<Self, Self::UnpackError> {
+    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
         Ok(Self(ciborium::from_reader(&bytes[..])?))
     }
 }

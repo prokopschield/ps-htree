@@ -26,11 +26,11 @@ where
     type UnpackError = Error;
     type PackError = Error;
 
-    fn pack(&self, _: impl ps_hkey::Store) -> Result<Bytes, Self::PackError> {
+    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(to_bytes::<Error>(&self.0)?))
     }
 
-    fn unpack(bytes: Bytes, _: impl ps_hkey::Store) -> Result<Self, Self::UnpackError> {
+    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
         let archived = rkyv::access::<T::Archived, Error>(&bytes)?;
         let value: T = deserialize(archived)?;
 
