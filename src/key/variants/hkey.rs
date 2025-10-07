@@ -1,4 +1,3 @@
-use ps_base64::base64;
 use ps_hkey::{Hkey, Store};
 use ps_uuid::{UUID, UUID_BYTES};
 
@@ -11,12 +10,7 @@ impl HtreeKey for Hkey {
 
     #[allow(clippy::cast_possible_truncation)]
     fn try_to_uuid<S: Store>(&self, store: &S) -> Result<UUID, HtreeKeyError<S>> {
-        let input = base64::decode(
-            self.shrink(store)
-                .map_err(|err| HtreeKeyError::Store(err))?
-                .to_string()
-                .as_bytes(),
-        );
+        let input = self.compact(store).map_err(HtreeKeyError::Store)?;
 
         let copy_length = input.len().min(UUID_BYTES);
 
