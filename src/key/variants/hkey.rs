@@ -21,7 +21,7 @@ impl HtreeKey for Hkey {
         let fold = &mut uuid.as_mut_bytes()[8..16];
 
         for (chunk_index, chunk) in input.chunks(8).skip(2).enumerate() {
-            fold.rotate_right(chunk_index & 7);
+            fold.rotate_left(chunk_index & 7);
 
             for (byte_index, byte) in chunk.iter().enumerate() {
                 fold[byte_index] ^= *byte;
