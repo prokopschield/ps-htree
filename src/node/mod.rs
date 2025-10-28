@@ -1,5 +1,6 @@
 mod implementations;
 mod inner;
+mod methods;
 
 use ps_rwt::RWT;
 
