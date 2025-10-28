@@ -3,7 +3,12 @@ mod variants;
 
 use bytes::Bytes;
 pub use error::{HtreeValueFetchError, HtreeValueStoreError};
-pub use variants::*;
+
+#[cfg(feature = "rkyv")]
+pub use variants::HtreeRkyvValue;
+
+#[cfg(feature = "serde")]
+pub use variants::HtreeSerdeValue;
 
 pub trait HtreeValue
 where

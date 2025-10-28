@@ -5,7 +5,12 @@ use bytes::Bytes;
 pub use error::HtreeKeyError;
 use ps_hkey::{Hkey, Store};
 use ps_uuid::UUID;
-pub use variants::*;
+
+#[cfg(feature = "rkyv")]
+pub use variants::HtreeRkyvKey;
+
+#[cfg(feature = "serde")]
+pub use variants::HtreeSerdeKey;
 
 pub trait HtreeKey {
     /// Serializes this [`HtreeKey`] and returns its byte representation.
