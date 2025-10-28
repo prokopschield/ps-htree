@@ -1,0 +1,26 @@
+[package]
+name = "ps-htree"
+version = "0.1.0-0"
+edition = "2021"
+
+[dependencies]
+bytes = "1.10.1"
+postcard = { version = "1.1.3", features = ["alloc"], optional = true }
+ps-hash = "0.1.0-23"
+ps-hkey = "0.1.0-30"
+ps-rwt = "0.1.0-1"
+ps-uuid = "0.1.0-2"
+rkyv = { version = "0.8", optional = true }
+serde = { version = "1.0", optional = true }
+thiserror = "2.0.17"
+
+[features]
+default = []
+rkyv = ["dep:rkyv"]
+serde = ["dep:postcard", "dep:serde", "ps-uuid/serde"]
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
