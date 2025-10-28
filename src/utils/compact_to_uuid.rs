@@ -1,5 +1,6 @@
 use ps_uuid::{UUID, UUID_BYTES};
 
+#[must_use]
 pub fn compact_to_uuid(bytes: &[u8]) -> UUID {
     let mut uuid = UUID::nil();
 
