@@ -15,10 +15,8 @@ where
     where
         S: Store,
     {
-        let mut bytes = Vec::new();
-
-        ciborium::into_writer(&self.0, &mut bytes)?;
-
-        bytes.as_slice().try_to_hkey(store)
+        postcard::to_allocvec(&self.0)?
+            .as_slice()
+            .try_to_hkey(store)
     }
 }

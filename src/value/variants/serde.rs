@@ -11,18 +11,14 @@ impl<T> HtreeValue for HtreeSerdeValue<T>
 where
     T: Serialize + DeserializeOwned,
 {
-    type PackError = ciborium::ser::Error<std::io::Error>;
-    type UnpackError = ciborium::de::Error<std::io::Error>;
+    type PackError = postcard::Error;
+    type UnpackError = postcard::Error;
 
-    fn pack<S>(&self, _store: &S) -> Result<bytes::Bytes, Self::PackError> {
-        let mut bytes = Vec::new();
-
-        ciborium::into_writer(&self.0, &mut bytes)?;
-
-        Ok(Bytes::from_owner(bytes))
+    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+        Ok(Bytes::from_owner(postcard::to_allocvec(&self.0)?))
     }
 
     fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
-        Ok(Self(ciborium::from_reader(&bytes[..])?))
+        Ok(Self(postcard::from_bytes(&bytes)?))
     }
 }
