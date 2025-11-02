@@ -16,27 +16,22 @@ impl<T> HtreeNode<T> {
     ///
     /// # Arguments
     ///
-    /// * `children` - An iterator of items that can be referenced as
-    ///   `HtreeNode<T>`.
+    /// * `children` - An iterator of child nodes.
     /// * `store` - The backing store for persisting node data.
     ///
     /// # Errors
     ///
     /// Returns [`HtreeNodeFromChildrenError`] if serialization or store
     /// operations fail.
-    pub fn from_children<I, R, S>(
+    pub fn from_children<I, S>(
         children: I,
         store: &S,
     ) -> Result<Self, HtreeNodeFromChildrenError<S>>
     where
-        I: IntoIterator<Item = R>,
-        R: AsRef<Self>,
+        I: IntoIterator<Item = Self>,
         S: Store,
     {
-        let mut children: Vec<Self> = children
-            .into_iter()
-            .map(|child| child.as_ref().clone())
-            .collect();
+        let mut children: Vec<Self> = children.into_iter().collect();
 
         if children.is_empty() {
             return Ok(Self::default());
