@@ -53,6 +53,8 @@ pub enum HtreeNodeFromKvpError<S: Store, T: HtreeValue> {
     Store(S::Error),
 }
 
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl<S: Store, T: HtreeValue> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<S, T> {
     fn from(value: HtreeKeyError<S>) -> Self {
         match value {

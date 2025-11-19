@@ -61,6 +61,8 @@ pub enum HtreeNodeSelectChildError<S: Store> {
     UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
 }
 
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl<S: Store> From<crate::HtreeKeyError<S>> for HtreeNodeSelectChildError<S> {
     fn from(value: crate::HtreeKeyError<S>) -> Self {
         match value {
