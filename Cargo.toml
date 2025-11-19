@@ -4,10 +4,10 @@ version = "0.1.0-0"
 edition = "2024"
 
 [dependencies]
-bytes = "1.10.1"
+bytes = "1.11.0"
 postcard = { version = "1.1.3", features = ["alloc"], optional = true }
 ps-hash = "0.1.0-23"
-ps-hkey = "0.1.0-30"
+ps-hkey = "0.1.0-31"
 ps-rwt = "0.1.0-1"
 ps-util = "0.1.0-6"
 ps-uuid = "0.1.0-2"
