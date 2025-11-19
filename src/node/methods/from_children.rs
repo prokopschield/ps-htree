@@ -1,5 +1,6 @@
 use ps_hkey::{DOUBLE_HASH_SIZE_COMPACT, Store};
 use ps_rwt::RWT;
+use ps_util::Array;
 use ps_uuid::UUID_BYTES;
 
 use crate::{
@@ -23,6 +24,8 @@ impl<T> HtreeNode<T> {
     ///
     /// Returns [`HtreeNodeFromChildrenError`] if serialization or store
     /// operations fail.
+    /// - [`HtreeNodeFromChildrenError::ChildHeightInconsistent`] is returned if not all of the children share the same height.
+    /// - [`HtreeNodeFromChildrenError::HeightOverflow`] is returned if the node's height overflows (>255).
     pub fn from_children<I, S>(
         children: I,
         store: &S,
@@ -34,12 +37,22 @@ impl<T> HtreeNode<T> {
         let mut children: Vec<Self> = children.into_iter().collect();
 
         if children.is_empty() {
+            // return an empty node
             return Ok(Self::default());
         }
 
         children.sort();
 
-        let height = children[0].height + 1;
+        let first_height = children[0].height;
+
+        if children.some(|child| child.height != first_height) {
+            return Err(HtreeNodeFromChildrenError::ChildHeightInconsistent);
+        }
+
+        let Some(height) = first_height.checked_add(1) else {
+            return Err(HtreeNodeFromChildrenError::HeightOverflow);
+        };
+
         let key = children[0].key;
         let hkey = store
             .put(&serialize_children(&children, store)?)
@@ -97,9 +110,16 @@ fn serialize_children<T, S: Store>(
 /// Errors that can occur when constructing a node from children.
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeFromChildrenError<S: Store> {
+    #[error("Child nodes must all have the same height.")]
+    ChildHeightInconsistent,
+
+    #[error("Maximum height of 255 exceeded.")]
+    HeightOverflow,
+
     /// An integer conversion failed (e.g., hkey length exceeds byte range).
     #[error("Integer conversion error: {0}")]
     IntConv(#[from] std::num::TryFromIntError),
+
     /// A store operation failed.
     #[error("Store error: {0}")]
     Store(S::Error),
