@@ -65,14 +65,14 @@ impl<T> HtreeNode<T> {
         // Collect children in range [first_index, last_index]
         let result = children[first_index..=last_index].to_vec();
 
+        drop(guard);
+
         // Check whether the query falls entirely before the first child's key
         if let Some(first_item) = result.first()
             && first_item.key > to
         {
             return Ok(vec![]);
         }
-
-        drop(guard);
 
         Ok(result)
     }
