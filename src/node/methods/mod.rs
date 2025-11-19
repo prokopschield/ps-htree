@@ -4,6 +4,7 @@ mod from_kvp;
 mod is_leaf;
 mod resolve;
 mod select_child;
+mod select_child_range;
 mod unpack;
 mod unpack_children;
 
@@ -12,5 +13,6 @@ pub use from_children::HtreeNodeFromChildrenError;
 pub use from_kvp::HtreeNodeFromKvpError;
 pub use resolve::HtreeNodeResolveError;
 pub use select_child::HtreeNodeSelectChildError;
+pub use select_child_range::HtreeNodeSelectChildRangeError;
 pub use unpack::HtreeNodeUnpackError;
 pub use unpack_children::HtreeNodeUnpackChildrenError;
