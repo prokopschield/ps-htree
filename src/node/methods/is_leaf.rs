@@ -1,8 +1,8 @@
-use crate::HtreeNode;
+use crate::{HtreeNode, LEAF_HEIGHT};
 
 impl<T> HtreeNode<T> {
     #[must_use]
     pub fn is_leaf(&self) -> bool {
-        self.height == 0
+        self.height == LEAF_HEIGHT
     }
 }
