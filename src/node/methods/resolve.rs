@@ -12,6 +12,10 @@ impl<T> HtreeNode<T> {
     pub fn resolve<S: Store>(&self, store: &S) -> Result<(), HtreeNodeResolveError<S>> {
         use HtreeNodeWritable::{Empty, Internal, Leaf};
 
+        if let Empty | Internal { .. } | Leaf = *self.read() {
+            return Ok(());
+        }
+
         let mut guard = self.write();
 
         if let Empty | Internal { .. } | Leaf = *guard {
