@@ -46,9 +46,18 @@ impl<T: HtreeValue> HtreeNode<T> {
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeFromKvpError<S: Store, T: HtreeValue> {
     #[error("Key error: {0}")]
-    Key(#[from] HtreeKeyError<S>),
+    Key(HtreeKeyError<S>),
     #[error("Pack error: {0}")]
     Pack(T::PackError),
     #[error("Store error: {0}")]
     Store(S::Error),
+}
+
+impl<S: Store, T: HtreeValue> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<S, T> {
+    fn from(value: HtreeKeyError<S>) -> Self {
+        match value {
+            HtreeKeyError::Store(err) => Self::Store(err),
+            err => Self::Key(err),
+        }
+    }
 }
