@@ -1,11 +1,13 @@
 use ps_hkey::Store;
+use ps_util::Array;
 
 use crate::{HtreeKey, HtreeNode, node::inner::HtreeNodeWritable};
 
 impl<T> HtreeNode<T> {
     /// Selects all child nodes whose key ranges may contain values within the inclusive range [from, to].
     ///
-    /// Returns all children whose key ranges intersect with [from, to].
+    /// For internal nodes, returns all whose ranges might overlap [from, to].
+    /// For leaf nodes, returns only those whose keys fall within [from, to].
     ///
     /// # Arguments
     ///
@@ -73,6 +75,9 @@ impl<T> HtreeNode<T> {
         {
             return Ok(vec![]);
         }
+
+        // Filter leaves outside of range
+        let result = result.filter(|item| !item.is_leaf() || (from <= item.key && item.key <= to));
 
         Ok(result)
     }
