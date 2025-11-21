@@ -3,7 +3,7 @@ use ps_hkey::Store;
 use crate::{HtreeNode, LEAF_HEIGHT, MAX_CHILDREN};
 
 impl<T> HtreeNode<T> {
-    /// Inserts children into this node, rebalancing if necessary.
+    /// Inserts leaves into this node, rebalancing if necessary.
     ///
     /// Accepts both leaf and internal nodes. Returns potentially multiple sibling
     /// nodes if rebalancing causes the tree to split.
@@ -13,16 +13,16 @@ impl<T> HtreeNode<T> {
     /// * `store` - Persistence backend
     ///
     /// # Errors
-    /// - [`HtreeNodeInsertChildrenError::CorruptedLeaf`] is returned if a leaf's state is invalid.
-    /// - [`HtreeNodeInsertChildrenError::CorruptedNode`] is returned if this node's state is invalid.
-    /// - [`HtreeNodeInsertChildrenError::FromChildren`] is returned if node reconstruction fails.
-    /// - [`HtreeNodeInsertChildrenError::Store`] is returned if store operations fail.
-    /// - [`HtreeNodeInsertChildrenError::UnpackChildren`] is returned if child deserialization fails.
-    pub fn insert_children<I: IntoIterator<Item = Self>, S: Store>(
+    /// - [`HtreeNodeInsertLeavesError::CorruptedLeaf`] is returned if a leaf's state is invalid.
+    /// - [`HtreeNodeInsertLeavesError::CorruptedNode`] is returned if this node's state is invalid.
+    /// - [`HtreeNodeInsertLeavesError::FromChildren`] is returned if node reconstruction fails.
+    /// - [`HtreeNodeInsertLeavesError::Store`] is returned if store operations fail.
+    /// - [`HtreeNodeInsertLeavesError::UnpackChildren`] is returned if child deserialization fails.
+    pub fn insert_leaves<I: IntoIterator<Item = Self>, S: Store>(
         &self,
         children: I,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeInsertChildrenError<S>> {
+    ) -> Result<Vec<Self>, HtreeNodeInsertLeavesError<S>> {
         if self.height <= LEAF_HEIGHT + 1 {
             let mut leaves = vec![];
 
@@ -83,7 +83,7 @@ impl<T> HtreeNode<T> {
             if leaves.is_empty() {
                 children.push(node);
             } else {
-                children.extend(node.insert_children(leaves, store)?);
+                children.extend(node.insert_leaves(leaves, store)?);
             }
         }
 
@@ -94,7 +94,7 @@ impl<T> HtreeNode<T> {
 fn aggregate_children<T, S: Store>(
     children: Vec<HtreeNode<T>>,
     store: &S,
-) -> Result<Vec<HtreeNode<T>>, HtreeNodeInsertChildrenError<S>> {
+) -> Result<Vec<HtreeNode<T>>, HtreeNodeInsertLeavesError<S>> {
     if children.is_empty() {
         return Ok(Vec::new());
     }
@@ -117,7 +117,7 @@ fn aggregate_children<T, S: Store>(
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeNodeInsertChildrenError<S: Store> {
+pub enum HtreeNodeInsertLeavesError<S: Store> {
     #[error("Inserted leaf's state is corrupted.")]
     CorruptedLeaf,
     #[error("HtreeNode's state is corrupted.")]
@@ -130,7 +130,7 @@ pub enum HtreeNodeInsertChildrenError<S: Store> {
     UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
 }
 
-impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeInsertChildrenError<S> {
+impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeInsertLeavesError<S> {
     fn from(value: crate::HtreeNodeFetchChildrenError<S>) -> Self {
         match value {
             crate::HtreeNodeFetchChildrenError::CorruptedState => Self::CorruptedNode,
@@ -140,7 +140,7 @@ impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeInsertCh
     }
 }
 
-impl<S: Store> From<crate::HtreeNodeIterLeavesError<S>> for HtreeNodeInsertChildrenError<S> {
+impl<S: Store> From<crate::HtreeNodeIterLeavesError<S>> for HtreeNodeInsertLeavesError<S> {
     fn from(value: crate::HtreeNodeIterLeavesError<S>) -> Self {
         match value {
             crate::HtreeNodeIterLeavesError::CorruptedState => Self::CorruptedLeaf,
@@ -150,7 +150,7 @@ impl<S: Store> From<crate::HtreeNodeIterLeavesError<S>> for HtreeNodeInsertChild
     }
 }
 
-impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodeInsertChildrenError<S> {
+impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodeInsertLeavesError<S> {
     fn from(value: crate::HtreeNodeFromChildrenError<S>) -> Self {
         match value {
             crate::HtreeNodeFromChildrenError::Store(err) => Self::Store(err),
