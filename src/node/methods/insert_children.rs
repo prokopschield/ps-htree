@@ -80,7 +80,11 @@ impl<T> HtreeNode<T> {
         let mut children = Vec::new();
 
         for (node, leaves) in groups {
-            children.extend(node.insert_children(leaves, store)?);
+            if leaves.is_empty() {
+                children.push(node);
+            } else {
+                children.extend(node.insert_children(leaves, store)?);
+            }
         }
 
         aggregate_children(children, store)
