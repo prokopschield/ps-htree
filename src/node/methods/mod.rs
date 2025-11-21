@@ -1,3 +1,4 @@
+mod fetch_children;
 mod find_one;
 mod find_range;
 mod from_children;
@@ -9,6 +10,7 @@ mod select_child_range;
 mod unpack;
 mod unpack_children;
 
+pub use fetch_children::HtreeNodeFetchChildrenError;
 pub use find_one::HtreeNodeFindOneError;
 pub use find_range::HtreeNodeFindRangeError;
 pub use from_children::HtreeNodeFromChildrenError;
