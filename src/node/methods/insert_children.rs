@@ -23,7 +23,7 @@ impl<T> HtreeNode<T> {
         children: I,
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeInsertChildrenError<S>> {
-        if self.height == LEAF_HEIGHT + 1 {
+        if self.height <= LEAF_HEIGHT + 1 {
             let mut leaves = vec![];
 
             for child in self
