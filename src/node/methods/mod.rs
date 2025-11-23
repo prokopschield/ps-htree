@@ -13,6 +13,7 @@ mod select_child;
 mod select_child_range;
 mod unpack;
 mod unpack_children;
+mod upsert_leaves;
 
 pub use fetch_children::HtreeNodeFetchChildrenError;
 pub use find_one::HtreeNodeFindOneError;
@@ -28,3 +29,4 @@ pub use select_child::HtreeNodeSelectChildError;
 pub use select_child_range::HtreeNodeSelectChildRangeError;
 pub use unpack::HtreeNodeUnpackError;
 pub use unpack_children::HtreeNodeUnpackChildrenError;
+pub use upsert_leaves::HtreeNodeUpsertLeavesError;
