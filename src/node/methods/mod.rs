@@ -15,6 +15,7 @@ mod unpack;
 mod unpack_children;
 mod upsert_leaves;
 mod upsert_many;
+mod upsert_one;
 
 pub use fetch_children::HtreeNodeFetchChildrenError;
 pub use find_one::HtreeNodeFindOneError;
@@ -32,3 +33,4 @@ pub use unpack::HtreeNodeUnpackError;
 pub use unpack_children::HtreeNodeUnpackChildrenError;
 pub use upsert_leaves::HtreeNodeUpsertLeavesError;
 pub use upsert_many::HtreeNodeUpsertManyError;
+pub use upsert_one::HtreeNodeUpsertOneError;
