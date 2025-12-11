@@ -12,4 +12,5 @@ mod serde;
 #[cfg(feature = "serde")]
 pub use serde::HtreeSerdeValue;
 
+mod unit;
 mod uuid;
