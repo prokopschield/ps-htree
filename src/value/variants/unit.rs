@@ -24,7 +24,7 @@ impl HtreeValue for () {
         Ok(closure(&[]))
     }
 
-    fn unpack<S>(_: Bytes, _: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack<S: Store>(_: &[u8], _: &S) -> Result<Self, Self::UnpackError> {
         Ok(())
     }
 }

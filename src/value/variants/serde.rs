@@ -34,7 +34,7 @@ where
         ))
     }
 
-    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
-        Ok(Self(postcard::from_bytes(&bytes)?))
+    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
+        Ok(Self(postcard::from_bytes(bytes)?))
     }
 }

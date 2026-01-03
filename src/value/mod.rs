@@ -36,8 +36,21 @@ where
         Ok(closure(&self.pack_owned(store)?))
     }
 
-    /// Unpacks this `HtreeValue` from a canonical byte representation
+    /// Unpacks this `HtreeValue` from a canonical byte representation.
+    ///
     /// # Errors
-    /// Returns a `UnpackError` if packing fails.
-    fn unpack<S: Store>(bytes: Bytes, store: &S) -> Result<Self, Self::UnpackError>;
+    ///
+    /// Returns an `UnpackError` if unpacking fails.
+    fn unpack<S: Store>(bytes: &[u8], store: &S) -> Result<Self, Self::UnpackError>;
+
+    /// Unpacks this `HtreeValue` from an owned canonical byte representation.
+    ///
+    /// Only implement this method if your implementation benefits from ownership of the received buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `UnpackError` if unpacking fails.
+    fn unpack_from_bytes<S: Store>(bytes: Bytes, store: &S) -> Result<Self, Self::UnpackError> {
+        Self::unpack(&bytes, store)
+    }
 }

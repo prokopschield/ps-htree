@@ -24,7 +24,11 @@ impl HtreeValue for Bytes {
         Ok(closure(self))
     }
 
-    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack<S: Store>(bytes: &[u8], _: &S) -> Result<Self, Self::UnpackError> {
+        Ok(Self::copy_from_slice(bytes))
+    }
+
+    fn unpack_from_bytes<S>(bytes: Bytes, _: &S) -> Result<Self, Self::UnpackError> {
         Ok(bytes)
     }
 }

@@ -25,8 +25,8 @@ impl HtreeValue for UUID {
         Ok(closure(self.to_string().as_bytes()))
     }
 
-    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
-        match std::str::from_utf8(&bytes) {
+    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
+        match std::str::from_utf8(bytes) {
             Ok(str) => FromStr::from_str(str),
             Err(err) => Err(Self::UnpackError::InvalidCharacter {
                 ch: bytes[err.valid_up_to()] as char,

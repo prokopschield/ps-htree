@@ -25,7 +25,7 @@ impl HtreeValue for Hash {
         Ok(closure(self.to_string().as_bytes()))
     }
 
-    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
         Self::validate(bytes)
     }
 }

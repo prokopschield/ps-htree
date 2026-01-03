@@ -46,8 +46,8 @@ where
         ))
     }
 
-    fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
-        let archived = rkyv::access::<T::Archived, Error>(&bytes)?;
+    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
+        let archived = rkyv::access::<T::Archived, Error>(bytes)?;
         let value: T = deserialize(archived)?;
 
         Ok(Self(value))
