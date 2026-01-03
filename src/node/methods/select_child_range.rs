@@ -64,6 +64,11 @@ impl<T> HtreeNode<T> {
             .partition_point(|child| child.key <= to)
             .saturating_sub(1);
 
+        // Defensive early return, protects against corrupted child lists
+        if last_index < first_index {
+            return Ok(vec![]);
+        }
+
         // Collect children in range [first_index, last_index]
         let result = children[first_index..=last_index].to_vec();
 
