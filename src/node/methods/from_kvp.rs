@@ -25,7 +25,7 @@ impl<T: HtreeValue> HtreeNode<T> {
         key: &impl HtreeKey,
         value: &T,
         store: &S,
-    ) -> Result<Self, HtreeNodeFromKvpError<S, T>> {
+    ) -> Result<Self, HtreeNodeFromKvpError<T, S>> {
         let key = key.try_to_uuid(store)?;
         let hkey = value
             .pack_into(|bytes| store.put(bytes), store)?
@@ -45,7 +45,11 @@ impl<T: HtreeValue> HtreeNode<T> {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeNodeFromKvpError<S: Store, T: HtreeValue> {
+pub enum HtreeNodeFromKvpError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error("Key error: {0}")]
     Key(HtreeKeyError<S>),
     #[error("Pack error: {0}")]
@@ -56,7 +60,11 @@ pub enum HtreeNodeFromKvpError<S: Store, T: HtreeValue> {
 
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_wildcard_for_single_variants)]
-impl<S: Store, T: HtreeValue> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<S, T> {
+impl<T, S> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     fn from(value: HtreeKeyError<S>) -> Self {
         match value {
             HtreeKeyError::Store(err) => Self::Store(err),
@@ -65,8 +73,10 @@ impl<S: Store, T: HtreeValue> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<S
     }
 }
 
-impl<S: Store, T: HtreeValue> From<crate::HtreeValuePackError<T, S>>
-    for HtreeNodeFromKvpError<S, T>
+impl<T, S> From<crate::HtreeValuePackError<T, S>> for HtreeNodeFromKvpError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
 {
     fn from(value: crate::HtreeValuePackError<T, S>) -> Self {
         match value {

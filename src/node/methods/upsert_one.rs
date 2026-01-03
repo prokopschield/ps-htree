@@ -23,27 +23,33 @@ impl<T: HtreeValue> HtreeNode<T> {
         key: &impl HtreeKey,
         value: &T,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeUpsertOneError<S, T>> {
+    ) -> Result<Vec<Self>, HtreeNodeUpsertOneError<T, S>> {
         Ok(self.upsert_many([(key, value)], store)?)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeNodeUpsertOneError<S: Store, V: HtreeValue> {
+pub enum HtreeNodeUpsertOneError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error(transparent)]
     UpsertLeaves(crate::HtreeNodeUpsertLeavesError<S>),
     #[error("Key error: {0}")]
     Key(crate::HtreeKeyError<S>),
     #[error("Pack error: {0}")]
-    Pack(V::PackError),
+    Pack(T::PackError),
     #[error("Store error: {0}")]
     Store(S::Error),
 }
 
-impl<S: Store, V: HtreeValue> From<crate::HtreeNodeUpsertManyError<S, V>>
-    for HtreeNodeUpsertOneError<S, V>
+impl<T, S> From<crate::HtreeNodeUpsertManyError<T, S>> for HtreeNodeUpsertOneError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
 {
-    fn from(value: crate::HtreeNodeUpsertManyError<S, V>) -> Self {
+    fn from(value: crate::HtreeNodeUpsertManyError<T, S>) -> Self {
         match value {
             crate::HtreeNodeUpsertManyError::UpsertLeaves(err) => Self::UpsertLeaves(err),
             crate::HtreeNodeUpsertManyError::Key(err) => Self::Key(err),

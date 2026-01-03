@@ -20,7 +20,7 @@ impl<V> HtreeNode<V> {
         &self,
         items: I,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeUpsertManyError<S, V>>
+    ) -> Result<Vec<Self>, HtreeNodeUpsertManyError<V, S>>
     where
         K: HtreeKey + 'k,
         V: HtreeValue + 'v,
@@ -30,7 +30,7 @@ impl<V> HtreeNode<V> {
         let leaves: Vec<Self> = items
             .into_iter()
             .map(|(key, value)| Self::from_kvp(key, value, store))
-            .collect::<Result<Vec<Self>, crate::HtreeNodeFromKvpError<S, V>>>()?;
+            .collect::<Result<Vec<Self>, crate::HtreeNodeFromKvpError<V, S>>>()?;
 
         Ok(self.upsert_leaves(leaves, store)?)
     }
@@ -43,21 +43,27 @@ impl<V> HtreeNode<V> {
 ///
 /// [`Store`]: HtreeNodeUpsertManyError::Store
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeNodeUpsertManyError<S: Store, V: HtreeValue> {
+pub enum HtreeNodeUpsertManyError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error(transparent)]
     UpsertLeaves(crate::HtreeNodeUpsertLeavesError<S>),
     #[error("Key error: {0}")]
     Key(crate::HtreeKeyError<S>),
     #[error("Pack error: {0}")]
-    Pack(V::PackError),
+    Pack(T::PackError),
     #[error("Store error: {0}")]
     Store(S::Error),
 }
 
-impl<S: Store, V: HtreeValue> From<crate::HtreeNodeFromKvpError<S, V>>
-    for HtreeNodeUpsertManyError<S, V>
+impl<T, S> From<crate::HtreeNodeFromKvpError<T, S>> for HtreeNodeUpsertManyError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
 {
-    fn from(err: crate::HtreeNodeFromKvpError<S, V>) -> Self {
+    fn from(err: crate::HtreeNodeFromKvpError<T, S>) -> Self {
         match err {
             crate::HtreeNodeFromKvpError::Store(err) => Self::Store(err),
             crate::HtreeNodeFromKvpError::Key(err) => err.into(),
@@ -66,8 +72,10 @@ impl<S: Store, V: HtreeValue> From<crate::HtreeNodeFromKvpError<S, V>>
     }
 }
 
-impl<S: Store, V: HtreeValue> From<crate::HtreeNodeUpsertLeavesError<S>>
-    for HtreeNodeUpsertManyError<S, V>
+impl<T, S> From<crate::HtreeNodeUpsertLeavesError<S>> for HtreeNodeUpsertManyError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
 {
     fn from(value: crate::HtreeNodeUpsertLeavesError<S>) -> Self {
         match value {
@@ -85,7 +93,11 @@ impl<S: Store, V: HtreeValue> From<crate::HtreeNodeUpsertLeavesError<S>>
 /// [`HtreeKeyError`]: crate::HtreeKeyError
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_wildcard_for_single_variants)]
-impl<S: Store, V: HtreeValue> From<crate::HtreeKeyError<S>> for HtreeNodeUpsertManyError<S, V> {
+impl<T, S> From<crate::HtreeKeyError<S>> for HtreeNodeUpsertManyError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     fn from(value: crate::HtreeKeyError<S>) -> Self {
         match value {
             crate::HtreeKeyError::Store(err) => Self::Store(err),

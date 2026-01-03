@@ -23,27 +23,33 @@ impl<T: HtreeValue> HtreeNode<T> {
         key: &impl HtreeKey,
         value: &T,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeInsertOneError<S, T>> {
+    ) -> Result<Vec<Self>, HtreeNodeInsertOneError<T, S>> {
         Ok(self.insert_many([(key, value)], store)?)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeNodeInsertOneError<S: Store, V: HtreeValue> {
+pub enum HtreeNodeInsertOneError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error(transparent)]
     InsertLeaves(crate::HtreeNodeInsertLeavesError<S>),
     #[error("Key error: {0}")]
     Key(crate::HtreeKeyError<S>),
     #[error("Pack error: {0}")]
-    Pack(V::PackError),
+    Pack(T::PackError),
     #[error("Store error: {0}")]
     Store(S::Error),
 }
 
-impl<S: Store, V: HtreeValue> From<crate::HtreeNodeInsertManyError<S, V>>
-    for HtreeNodeInsertOneError<S, V>
+impl<T, S> From<crate::HtreeNodeInsertManyError<T, S>> for HtreeNodeInsertOneError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
 {
-    fn from(value: crate::HtreeNodeInsertManyError<S, V>) -> Self {
+    fn from(value: crate::HtreeNodeInsertManyError<T, S>) -> Self {
         match value {
             crate::HtreeNodeInsertManyError::InsertLeaves(err) => Self::InsertLeaves(err),
             crate::HtreeNodeInsertManyError::Key(err) => Self::Key(err),
