@@ -1,6 +1,6 @@
 use ps_hkey::Store;
 
-use crate::{HtreeNode, LEAF_HEIGHT, MAX_CHILDREN};
+use crate::{HtreeNode, LEAF_HEIGHT};
 
 impl<T> HtreeNode<T> {
     /// Inserts leaves into this node, rebalancing if necessary.
@@ -42,9 +42,7 @@ impl<T> HtreeNode<T> {
                 }
             }
 
-            leaves.sort();
-
-            return aggregate_children(leaves, store);
+            return Self::from_many_children(leaves, store).map_err(Into::into);
         }
 
         let mut groups: Vec<(Self, Vec<Self>)> = self
@@ -87,33 +85,8 @@ impl<T> HtreeNode<T> {
             }
         }
 
-        aggregate_children(children, store)
+        Self::from_many_children(children, store).map_err(Into::into)
     }
-}
-
-fn aggregate_children<T, S: Store>(
-    children: Vec<HtreeNode<T>>,
-    store: &S,
-) -> Result<Vec<HtreeNode<T>>, HtreeNodeInsertLeavesError<S>> {
-    if children.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Minimum nodes needed to fit all children with ≤ MAX_CHILDREN each
-    let num_nodes = children.len().div_ceil(MAX_CHILDREN);
-    // Fair per-node size to minimize imbalance across siblings
-    let chunk_size = children.len().div_ceil(num_nodes);
-
-    let mut children = children.into_iter();
-    let mut nodes = Vec::with_capacity(num_nodes);
-
-    for _ in 0..num_nodes {
-        let chunk = children.by_ref().take(chunk_size);
-
-        nodes.push(HtreeNode::from_children(chunk, store)?);
-    }
-
-    Ok(nodes)
 }
 
 #[derive(thiserror::Error, Debug)]
