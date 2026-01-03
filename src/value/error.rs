@@ -1,15 +1,15 @@
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeValueStoreError<Ser, St> {
-    #[error("Serialization error: $0")]
-    Serialization(Ser),
+pub enum HtreeValuePackError<Ser, St> {
+    #[error("Pack error: $0")]
+    Pack(Ser),
     #[error("Storage error: $0")]
-    Storage(St),
+    Store(St),
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeValueFetchError<D, F> {
-    #[error("Deserialization error: $0")]
-    Deserialization(D),
+pub enum HtreeValueUnpackError<D, F> {
+    #[error("Unpack error: $0")]
+    Unpack(D),
     #[error("Fetch error: $0")]
-    Fetch(F),
+    Store(F),
 }

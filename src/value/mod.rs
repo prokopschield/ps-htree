@@ -2,7 +2,7 @@ mod error;
 mod variants;
 
 use bytes::Bytes;
-pub use error::{HtreeValueFetchError, HtreeValueStoreError};
+pub use error::{HtreeValuePackError, HtreeValueUnpackError};
 use ps_hkey::Store;
 
 #[cfg(feature = "rkyv")]
