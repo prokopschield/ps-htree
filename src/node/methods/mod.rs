@@ -4,6 +4,7 @@ mod find_range;
 mod from_children;
 mod from_kvp;
 mod from_many_children;
+mod height;
 mod insert_leaves;
 mod insert_many;
 mod insert_one;
