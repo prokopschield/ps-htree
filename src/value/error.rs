@@ -1,15 +1,27 @@
+use ps_hkey::Store;
+
+use crate::HtreeValue;
+
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeValuePackError<Ser, St> {
+pub enum HtreeValuePackError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error("Pack error: $0")]
-    Pack(Ser),
+    Pack(T::PackError),
     #[error("Storage error: $0")]
-    Store(St),
+    Store(S::Error),
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum HtreeValueUnpackError<D, F> {
+pub enum HtreeValueUnpackError<T, S>
+where
+    T: HtreeValue,
+    S: Store,
+{
     #[error("Unpack error: $0")]
-    Unpack(D),
+    Unpack(T::UnpackError),
     #[error("Fetch error: $0")]
-    Store(F),
+    Store(S::Error),
 }
