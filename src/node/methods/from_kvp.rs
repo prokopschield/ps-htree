@@ -27,10 +27,10 @@ impl<T: HtreeValue> HtreeNode<T> {
         store: &S,
     ) -> Result<Self, HtreeNodeFromKvpError<S, T>> {
         let key = key.try_to_uuid(store)?;
-        let packed = value
-            .pack_owned(store)
-            .map_err(HtreeNodeFromKvpError::Pack)?;
-        let hkey = store.put(&packed).map_err(HtreeNodeFromKvpError::Store)?;
+        let hkey = value
+            .pack_into(|bytes| store.put(bytes), store)
+            .map_err(HtreeNodeFromKvpError::Pack)?
+            .map_err(HtreeNodeFromKvpError::Store)?;
 
         Ok(Self {
             inner: RWT::new(
