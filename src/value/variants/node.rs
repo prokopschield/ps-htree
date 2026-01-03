@@ -85,3 +85,37 @@ where
         }
     }
 }
+
+impl<S> From<HtreeNodeAsValueUnpackError> for crate::HtreeNodeUnpackError<S>
+where
+    S: Store,
+{
+    fn from(value: HtreeNodeAsValueUnpackError) -> Self {
+        match value {
+            HtreeNodeAsValueUnpackError::ChildHeightInconsistent => {
+                Self::FromChildren(crate::HtreeNodeFromChildrenError::ChildHeightInconsistent)
+            }
+            HtreeNodeAsValueUnpackError::HeightOverflow => {
+                Self::FromChildren(crate::HtreeNodeFromChildrenError::HeightOverflow)
+            }
+            HtreeNodeAsValueUnpackError::IntConv(err) => {
+                Self::FromChildren(crate::HtreeNodeFromChildrenError::IntConv(err))
+            }
+            HtreeNodeAsValueUnpackError::UnpackChildren(err) => Self::UnpackChildren(err),
+        }
+    }
+}
+
+impl<T, S> From<HtreeValueUnpackError<T, S>> for crate::HtreeNodeUnpackError<S>
+where
+    T: HtreeValue,
+    S: Store,
+    Self: From<<T as HtreeValue>::UnpackError>,
+{
+    fn from(value: HtreeValueUnpackError<T, S>) -> Self {
+        match value {
+            HtreeValueUnpackError::Store(err) => Self::Store(err),
+            HtreeValueUnpackError::Unpack(err) => err.into(),
+        }
+    }
+}
