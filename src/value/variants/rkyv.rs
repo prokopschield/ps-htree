@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use ps_hkey::Store;
 use rkyv::{
     Archive, Serialize,
     api::high::HighSerializer,
@@ -12,7 +13,7 @@ use rkyv::{
     validation::{Validator, archive::ArchiveValidator, shared::SharedValidator},
 };
 
-use crate::HtreeValue;
+use crate::{HtreeValue, HtreeValuePackError};
 
 pub struct HtreeRkyvValue<T>(pub T);
 
@@ -26,16 +27,23 @@ where
     type UnpackError = Error;
     type PackError = Error;
 
-    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
-        Ok(Bytes::from_owner(to_bytes::<Error>(&self.0)?))
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, HtreeValuePackError<Self, S>>
+    where
+        S: Store,
+    {
+        Ok(Bytes::from_owner(
+            to_bytes::<Error>(&self.0).map_err(HtreeValuePackError::Pack)?,
+        ))
     }
 
-    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, HtreeValuePackError<Self, S>>
     where
         F: FnOnce(&[u8]) -> R,
         S: ps_hkey::Store,
     {
-        Ok(closure(&to_bytes::<Error>(&self.0)?))
+        Ok(closure(
+            &to_bytes::<Error>(&self.0).map_err(HtreeValuePackError::Pack)?,
+        ))
     }
 
     fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {

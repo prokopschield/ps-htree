@@ -1,19 +1,23 @@
 use std::{convert::Infallible, str::FromStr};
 
 use bytes::Bytes;
+use ps_hkey::Store;
 use ps_uuid::{UUID, UuidParseError};
 
-use crate::HtreeValue;
+use crate::{HtreeValue, HtreeValuePackError};
 
 impl HtreeValue for UUID {
     type PackError = Infallible;
     type UnpackError = UuidParseError;
 
-    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, HtreeValuePackError<Self, S>>
+    where
+        S: Store,
+    {
         Ok(Bytes::from_owner(self.to_string()))
     }
 
-    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, HtreeValuePackError<Self, S>>
     where
         F: FnOnce(&[u8]) -> R,
         S: ps_hkey::Store,

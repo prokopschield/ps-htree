@@ -21,14 +21,14 @@ where
     /// Packs this `HtreeValue` into a canonical byte representation
     /// # Errors
     /// Returns a `PackError` if packing fails.
-    fn pack_owned<S: Store>(&self, store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S: Store>(&self, store: &S) -> Result<Bytes, HtreeValuePackError<Self, S>> {
         self.pack_into(Bytes::copy_from_slice, store)
     }
 
     /// Packs this `HtreeValue` into a canonical byte representation, and passes this into the provided closure.
     /// # Errors
     /// Returns a `PackError` if packing fails.
-    fn pack_into<F, R, S>(&self, closure: F, store: &S) -> Result<R, Self::PackError>
+    fn pack_into<F, R, S>(&self, closure: F, store: &S) -> Result<R, HtreeValuePackError<Self, S>>
     where
         F: FnOnce(&[u8]) -> R,
         S: Store,

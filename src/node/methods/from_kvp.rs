@@ -28,8 +28,7 @@ impl<T: HtreeValue> HtreeNode<T> {
     ) -> Result<Self, HtreeNodeFromKvpError<S, T>> {
         let key = key.try_to_uuid(store)?;
         let hkey = value
-            .pack_into(|bytes| store.put(bytes), store)
-            .map_err(HtreeNodeFromKvpError::Pack)?
+            .pack_into(|bytes| store.put(bytes), store)?
             .map_err(HtreeNodeFromKvpError::Store)?;
 
         Ok(Self {
@@ -62,6 +61,17 @@ impl<S: Store, T: HtreeValue> From<HtreeKeyError<S>> for HtreeNodeFromKvpError<S
         match value {
             HtreeKeyError::Store(err) => Self::Store(err),
             err => Self::Key(err),
+        }
+    }
+}
+
+impl<S: Store, T: HtreeValue> From<crate::HtreeValuePackError<T, S>>
+    for HtreeNodeFromKvpError<S, T>
+{
+    fn from(value: crate::HtreeValuePackError<T, S>) -> Self {
+        match value {
+            crate::HtreeValuePackError::Pack(err) => Self::Pack(err),
+            crate::HtreeValuePackError::Store(err) => Self::Store(err),
         }
     }
 }

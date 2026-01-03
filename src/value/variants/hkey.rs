@@ -1,19 +1,22 @@
 use std::convert::Infallible;
 
 use bytes::Bytes;
-use ps_hkey::{Hkey, PsHkeyError};
+use ps_hkey::{Hkey, PsHkeyError, Store};
 
-use crate::HtreeValue;
+use crate::{HtreeValue, HtreeValuePackError};
 
 impl HtreeValue for Hkey {
     type PackError = Infallible;
     type UnpackError = PsHkeyError;
 
-    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, HtreeValuePackError<Self, S>>
+    where
+        S: Store,
+    {
         Ok(Bytes::from_owner(self.to_string()))
     }
 
-    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, HtreeValuePackError<Self, S>>
     where
         F: FnOnce(&[u8]) -> R,
         S: ps_hkey::Store,
