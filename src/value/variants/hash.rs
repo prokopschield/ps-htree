@@ -4,7 +4,7 @@ use bytes::Bytes;
 use ps_hash::HashValidationError;
 use ps_hkey::{Hash, Store};
 
-use crate::{HtreeValue, HtreeValuePackError};
+use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 impl HtreeValue for Hash {
     type PackError = Infallible;
@@ -25,7 +25,7 @@ impl HtreeValue for Hash {
         Ok(closure(self.to_string().as_bytes()))
     }
 
-    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
-        Self::validate(bytes)
+    fn unpack<S: Store>(bytes: &[u8], _store: &S) -> Result<Self, HtreeValueUnpackError<Self, S>> {
+        Self::validate(bytes).map_err(HtreeValueUnpackError::Unpack)
     }
 }

@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use bytes::Bytes;
 use ps_hkey::Store;
 
-use crate::{HtreeValue, HtreeValuePackError};
+use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 impl HtreeValue for () {
     type PackError = Infallible;
@@ -24,7 +24,7 @@ impl HtreeValue for () {
         Ok(closure(&[]))
     }
 
-    fn unpack<S: Store>(_: &[u8], _: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack<S: Store>(_: &[u8], _: &S) -> Result<Self, HtreeValueUnpackError<Self, S>> {
         Ok(())
     }
 }

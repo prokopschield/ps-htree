@@ -13,7 +13,7 @@ use rkyv::{
     validation::{Validator, archive::ArchiveValidator, shared::SharedValidator},
 };
 
-use crate::{HtreeValue, HtreeValuePackError};
+use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 pub struct HtreeRkyvValue<T>(pub T);
 
@@ -46,9 +46,10 @@ where
         ))
     }
 
-    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
-        let archived = rkyv::access::<T::Archived, Error>(bytes)?;
-        let value: T = deserialize(archived)?;
+    fn unpack<S: Store>(bytes: &[u8], _store: &S) -> Result<Self, HtreeValueUnpackError<Self, S>> {
+        let archived = rkyv::access::<T::Archived, Error>(bytes);
+        let archived = archived.map_err(HtreeValueUnpackError::Unpack)?;
+        let value: T = deserialize(archived).map_err(HtreeValueUnpackError::Unpack)?;
 
         Ok(Self(value))
     }

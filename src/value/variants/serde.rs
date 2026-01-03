@@ -2,7 +2,7 @@ use bytes::Bytes;
 use ps_hkey::Store;
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{HtreeValue, HtreeValuePackError};
+use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 pub struct HtreeSerdeValue<T>(pub T)
 where
@@ -34,7 +34,9 @@ where
         ))
     }
 
-    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
-        Ok(Self(postcard::from_bytes(bytes)?))
+    fn unpack<S: Store>(bytes: &[u8], _store: &S) -> Result<Self, HtreeValueUnpackError<Self, S>> {
+        Ok(Self(
+            postcard::from_bytes(bytes).map_err(HtreeValueUnpackError::Unpack)?,
+        ))
     }
 }

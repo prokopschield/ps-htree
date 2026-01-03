@@ -41,7 +41,7 @@ where
     /// # Errors
     ///
     /// Returns an `UnpackError` if unpacking fails.
-    fn unpack<S: Store>(bytes: &[u8], store: &S) -> Result<Self, Self::UnpackError>;
+    fn unpack<S: Store>(bytes: &[u8], store: &S) -> Result<Self, HtreeValueUnpackError<Self, S>>;
 
     /// Unpacks this `HtreeValue` from an owned canonical byte representation.
     ///
@@ -50,7 +50,10 @@ where
     /// # Errors
     ///
     /// Returns an `UnpackError` if unpacking fails.
-    fn unpack_from_bytes<S: Store>(bytes: Bytes, store: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack_from_bytes<S: Store>(
+        bytes: Bytes,
+        store: &S,
+    ) -> Result<Self, HtreeValueUnpackError<Self, S>> {
         Self::unpack(&bytes, store)
     }
 }

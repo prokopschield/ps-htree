@@ -4,7 +4,7 @@ use bytes::Bytes;
 use ps_hkey::Store;
 use ps_uuid::{UUID, UuidParseError};
 
-use crate::{HtreeValue, HtreeValuePackError};
+use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 impl HtreeValue for UUID {
     type PackError = Infallible;
@@ -25,7 +25,7 @@ impl HtreeValue for UUID {
         Ok(closure(self.to_string().as_bytes()))
     }
 
-    fn unpack<S>(bytes: &[u8], _store: &S) -> Result<Self, Self::UnpackError> {
+    fn unpack<S: Store>(bytes: &[u8], _store: &S) -> Result<Self, HtreeValueUnpackError<Self, S>> {
         match std::str::from_utf8(bytes) {
             Ok(str) => FromStr::from_str(str),
             Err(err) => Err(Self::UnpackError::InvalidCharacter {
@@ -33,5 +33,6 @@ impl HtreeValue for UUID {
                 idx: err.valid_up_to(),
             }),
         }
+        .map_err(HtreeValueUnpackError::Unpack)
     }
 }
