@@ -14,7 +14,7 @@ where
     type PackError = postcard::Error;
     type UnpackError = postcard::Error;
 
-    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(postcard::to_allocvec(&self.0)?))
     }
 

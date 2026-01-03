@@ -26,7 +26,7 @@ where
     type UnpackError = Error;
     type PackError = Error;
 
-    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(to_bytes::<Error>(&self.0)?))
     }
 
