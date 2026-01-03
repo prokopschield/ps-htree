@@ -30,6 +30,14 @@ where
         Ok(Bytes::from_owner(to_bytes::<Error>(&self.0)?))
     }
 
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    where
+        F: FnOnce(&[u8]) -> R,
+        S: ps_hkey::Store,
+    {
+        Ok(closure(&to_bytes::<Error>(&self.0)?))
+    }
+
     fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
         let archived = rkyv::access::<T::Archived, Error>(&bytes)?;
         let value: T = deserialize(archived)?;

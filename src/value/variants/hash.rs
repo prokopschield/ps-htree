@@ -14,6 +14,14 @@ impl HtreeValue for Hash {
         Ok(Bytes::from_owner(self.to_string()))
     }
 
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    where
+        F: FnOnce(&[u8]) -> R,
+        S: ps_hkey::Store,
+    {
+        Ok(closure(self.to_string().as_bytes()))
+    }
+
     fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
         Self::validate(bytes)
     }

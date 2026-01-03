@@ -12,6 +12,14 @@ impl HtreeValue for () {
         Ok(Bytes::from_owner(Vec::new()))
     }
 
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    where
+        F: FnOnce(&[u8]) -> R,
+        S: ps_hkey::Store,
+    {
+        Ok(closure(&[]))
+    }
+
     fn unpack<S>(_: Bytes, _: &S) -> Result<Self, Self::UnpackError> {
         Ok(())
     }

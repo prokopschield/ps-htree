@@ -18,6 +18,14 @@ where
         Ok(Bytes::from_owner(postcard::to_allocvec(&self.0)?))
     }
 
+    fn pack_into<F, R, S>(&self, closure: F, _: &S) -> Result<R, Self::PackError>
+    where
+        F: FnOnce(&[u8]) -> R,
+        S: ps_hkey::Store,
+    {
+        Ok(closure(&postcard::to_allocvec(&self.0)?))
+    }
+
     fn unpack<S>(bytes: Bytes, _store: &S) -> Result<Self, Self::UnpackError> {
         Ok(Self(postcard::from_bytes(&bytes)?))
     }
