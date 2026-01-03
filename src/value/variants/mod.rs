@@ -1,6 +1,7 @@
 mod bytes;
 mod hash;
 mod hkey;
+mod integers;
 mod node;
 
 #[cfg(feature = "rkyv")]
