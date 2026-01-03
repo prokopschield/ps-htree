@@ -9,7 +9,7 @@ impl HtreeValue for Hkey {
     type PackError = Infallible;
     type UnpackError = PsHkeyError;
 
-    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(self.to_string()))
     }
 

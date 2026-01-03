@@ -21,7 +21,7 @@ where
     /// Packs this `HtreeValue` into a canonical byte representation
     /// # Errors
     /// Returns a `PackError` if packing fails.
-    fn pack<S: Store>(&self, store: &S) -> Result<Bytes, Self::PackError>;
+    fn pack_owned<S: Store>(&self, store: &S) -> Result<Bytes, Self::PackError>;
 
     /// Unpacks this `HtreeValue` from a canonical byte representation
     /// # Errors

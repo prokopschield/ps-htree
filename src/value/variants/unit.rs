@@ -8,7 +8,7 @@ impl HtreeValue for () {
     type PackError = Infallible;
     type UnpackError = Infallible;
 
-    fn pack<S>(&self, _: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(Vec::new()))
     }
 

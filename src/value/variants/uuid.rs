@@ -9,7 +9,7 @@ impl HtreeValue for UUID {
     type PackError = Infallible;
     type UnpackError = UuidParseError;
 
-    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(Bytes::from_owner(self.to_string()))
     }
 

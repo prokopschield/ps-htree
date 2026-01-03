@@ -8,7 +8,7 @@ impl HtreeValue for Bytes {
     type PackError = Infallible;
     type UnpackError = Infallible;
 
-    fn pack<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
+    fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, Self::PackError> {
         Ok(self.clone())
     }
 

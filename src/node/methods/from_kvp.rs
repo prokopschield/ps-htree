@@ -27,7 +27,9 @@ impl<T: HtreeValue> HtreeNode<T> {
         store: &S,
     ) -> Result<Self, HtreeNodeFromKvpError<S, T>> {
         let key = key.try_to_uuid(store)?;
-        let packed = value.pack(store).map_err(HtreeNodeFromKvpError::Pack)?;
+        let packed = value
+            .pack_owned(store)
+            .map_err(HtreeNodeFromKvpError::Pack)?;
         let hkey = store.put(&packed).map_err(HtreeNodeFromKvpError::Store)?;
 
         Ok(Self {
