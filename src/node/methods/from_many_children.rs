@@ -34,25 +34,13 @@ impl<T> HtreeNode<T> {
         let num_groups = children.len().div_ceil(MAX_CHILDREN);
         let group_size = children.len().div_ceil(num_groups);
 
-        let mut groups = Vec::with_capacity(num_groups);
+        let mut iter = children.into_iter();
+        let mut nodes = Vec::with_capacity(num_groups);
 
-        // Optimization: Iterate down to 1.
-        // We handle the 0th index (the first group) after the loop
-        // to reuse the original 'children' allocation.
-        for i in (1..num_groups).rev() {
-            // Efficient: this moves the tail elements into a new Vec,
-            // leaving the head elements in place.
-            let tail = children.split_off(i * group_size);
-
-            groups.push(Self::from_children(tail, store)?);
+        for _ in 0..num_groups {
+            nodes.push(Self::from_children(iter.by_ref().take(group_size), store)?);
         }
 
-        // The remaining 'children' vec contains the first group [0..group_size].
-        groups.push(Self::from_children(children, store)?);
-
-        // We processed Last -> First, so reverse to get First -> Last.
-        groups.reverse();
-
-        Ok(groups)
+        Ok(nodes)
     }
 }
