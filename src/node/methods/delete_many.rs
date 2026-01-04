@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use ps_hkey::Store;
 use ps_uuid::UUID;
 
@@ -21,10 +19,12 @@ impl<T> HtreeNode<T> {
     ///   entire subtrees become empty.
     ///
     /// # Performance Characteristics
-    /// - Time: `O(K log N + L)` where `K` = number of keys to delete, `N` = total leaves in tree,
-    ///   `L` = leaves actually visited.
-    /// - Key-to-child routing uses binary search: `O(K log C)` where `C` = children per node.
-    /// - Only touches relevant subtrees, not the entire tree.
+    /// - **Initial Setup**: O(K log K) for sorting and deduplicating the input key set.
+    /// - **Traversal Time**: O(N_visited * log K) where N_visited is the total number of nodes in
+    ///   subtrees affected by the deletion keys.
+    /// - **Routing Complexity**: Each internal node uses binary search to partition the input
+    ///   slice: O(C log K) per node, where C is the children per node.
+    /// - **I/O Efficiency**: Only relevant subtrees are touched.
     ///
     /// # Errors
     /// This function can fail due to several error conditions:
@@ -49,14 +49,25 @@ impl<T> HtreeNode<T> {
         I: IntoIterator<Item = &'k K>,
         S: Store,
     {
-        let uuids = keys
+        let mut uuids = keys
             .into_iter()
             .map(|k| k.try_to_uuid(store))
-            .collect::<Result<HashSet<UUID>, _>>()
+            .collect::<Result<Vec<UUID>, _>>()
             .map_err(HtreeNodeDeleteManyError::Key)?;
 
         if uuids.is_empty() {
             return Ok(self.clone());
+        }
+
+        uuids.sort_unstable();
+        uuids.dedup();
+
+        if self.is_leaf() {
+            if uuids.binary_search(&self.key).is_ok() {
+                return Ok(Self::default());
+            } else {
+                return Ok(self.clone());
+            }
         }
 
         let siblings = self.delete_leaves_recursive(&uuids, store)?;
@@ -72,74 +83,75 @@ impl<T> HtreeNode<T> {
     /// Distributes deletion keys to appropriate child subtrees and rebuilds from results.
     ///
     /// # Algorithm
-    /// 1. **Leaf nodes**: Filter out matching leaves directly.
+    /// 1. **Leaf nodes**: Filter out matching leaves directly via `binary_search` on the input slice.
     /// 2. **Internal nodes**:
-    ///    - Partition keys to child ranges using binary search (`partition_point`)
-    ///    - Recurse on affected children only
-    ///    - Rebuild node from resulting child nodes
+    ///    - Partition the sorted `keys_to_delete` slice into contiguous sub-slices based on
+    ///      child boundaries using binary search (`partition_point`).
+    ///    - Recurse only on children whose ranges contain one or more keys in the slice.
+    ///    - Rebuild the node from resulting child nodes.
     ///
     /// # Returns
     /// `Vec<Self>` because internal node deletion can produce 0..N child nodes after merging.
     /// Single-node callers should use `into_iter().next().unwrap_or_default()`.
     ///
     /// # Performance Notes
-    /// - Key partitioning: `O(K log C)` where `C` = child count
-    /// - Avoids full tree traversal by only recursing on affected subtrees
-    /// - Temporary `HashSet` recreation per level (could be optimized with `&[UUID]` signature)
+    /// - **Partitioning**: O(C log K) where C is the child count and K is
+    ///   the number of keys remaining in the current recursive branch.
+    /// - **Search**: Utilizes binary search on the input slice rather than the children array,
+    ///   leveraging the pre-sorted nature of the batch request.
     fn delete_leaves_recursive<S: Store>(
         &self,
-        keys_to_delete: &HashSet<UUID>,
+        keys_to_delete: &[UUID],
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeDeleteManyError<S>> {
+        // Base case: This node is the parent of leaf nodes
         if self.height <= LEAF_HEIGHT + 1 {
             let current_leaves = self.fetch_children(store)?;
 
             // Filter out matching leaves
             let filtered: Vec<Self> = current_leaves
                 .into_iter()
-                .filter(|leaf| !keys_to_delete.contains(&leaf.key))
+                .filter(|leaf| {
+                    // binary_search provides O(log K) complexity
+                    keys_to_delete.binary_search(&leaf.key).is_err()
+                })
                 .collect();
 
             return Ok(Self::from_many_children(filtered, store)?);
         }
 
         let children = self.fetch_children(store)?;
+        let mut rebuilt_children = Vec::with_capacity(children.len());
 
-        // Group keys to the children that encompass them
-        let mut groups: Vec<(Self, HashSet<UUID>)> = children
-            .into_iter()
-            .map(|child| (child, HashSet::new()))
-            .collect();
+        // Efficiently slice keys_to_delete using the sliding pivot approach.
+        // We ignore keys smaller than the first child's key immediately.
+        let mut remaining_keys = if let Some(first) = children.first() {
+            &keys_to_delete[keys_to_delete.partition_point(|&k| k < first.key)..]
+        } else {
+            &[][..]
+        };
 
-        // We can't use partition_point easily for individual keys against groups here
-        // because keys_to_delete is a Set (unordered).
-        // Iterate keys is O(K), Binary search groups is O(log N). Total O(K log N).
-        // Since we have the Set, we iterate the Set.
-        for key in keys_to_delete {
-            let index = groups
-                .partition_point(|(node, _)| node.key <= *key)
-                .saturating_sub(1);
+        let mut iter = children.into_iter().peekable();
+        while let Some(node) = iter.next() {
+            // Find the boundary: keys belonging to the current node are those
+            // strictly less than the next sibling's key.
+            let (to_process, rest) = if let Some(next_sibling) = iter.peek() {
+                let mid = remaining_keys.partition_point(|&k| k < next_sibling.key);
+                remaining_keys.split_at(mid)
+            } else {
+                // Last child consumes the remainder of relevant keys
+                (remaining_keys, &[][..])
+            };
 
-            // Safety: groups is non-empty if self is internal and valid
-            if let Some(group) = groups.get_mut(index) {
-                group.1.insert(*key);
-            }
-        }
-
-        let mut rebuilt_children = Vec::new();
-
-        for (node, child_keys) in groups {
-            if child_keys.is_empty() {
+            if to_process.is_empty() {
                 rebuilt_children.push(node);
             } else {
-                // Pass the subset down.
-                // Since our recursive sig takes &HashSet, we assume the cost of
-                // rehashing for the child is acceptable for correctness/simplicity,
-                // though we could optimize by passing a slice if we changed signature.
-                let resulting_nodes = node.delete_leaves_recursive(&child_keys, store)?;
+                let resulting_nodes = node.delete_leaves_recursive(to_process, store)?;
 
                 rebuilt_children.extend(resulting_nodes);
             }
+
+            remaining_keys = rest;
         }
 
         Ok(Self::from_many_children(rebuilt_children, store)?)
