@@ -14,7 +14,7 @@ impl<T> HtreeNode<T> {
     ///
     /// # Errors
     /// See [`HtreeNodeIterLeavesError`] for all error variants.
-    pub fn iter_leaves<'s, S: Store>(&self, store: &'s S) -> HtreeNodeIterLeaves<'s, S, T> {
+    pub fn iter_leaves<'s, S: Store>(&self, store: &'s S) -> HtreeNodeIterLeaves<'s, T, S> {
         HtreeNodeIterLeaves {
             queue: vec![self.clone()],
             store,
@@ -27,12 +27,12 @@ impl<T> HtreeNode<T> {
 /// Maintains a stack-based queue of internal nodes to visit. On each call
 /// to `next()`, pops a node; if internal, fetches children and reverses
 /// them to maintain left-to-right yield order.
-pub struct HtreeNodeIterLeaves<'s, S: Store, T> {
+pub struct HtreeNodeIterLeaves<'s, T, S: Store> {
     queue: Vec<HtreeNode<T>>,
     store: &'s S,
 }
 
-impl<S: Store, T> Iterator for HtreeNodeIterLeaves<'_, S, T> {
+impl<S: Store, T> Iterator for HtreeNodeIterLeaves<'_, T, S> {
     type Item = Result<HtreeNode<T>, HtreeNodeIterLeavesError<S>>;
 
     fn next(&mut self) -> Option<Self::Item> {
