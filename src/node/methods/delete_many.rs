@@ -20,7 +20,7 @@ impl<T> HtreeNode<T> {
     ///
     /// # Performance Characteristics
     /// - **Initial Setup**: O(K log K) for sorting and deduplicating the input key set.
-    /// - **Traversal Time**: O(N_visited * log K) where N_visited is the total number of nodes in
+    /// - **Traversal Time**: `O(N_visited * log K)` where `N_visited` is the total number of nodes in
     ///   subtrees affected by the deletion keys.
     /// - **Routing Complexity**: Each internal node uses binary search to partition the input
     ///   slice: O(C log K) per node, where C is the children per node.
@@ -65,9 +65,9 @@ impl<T> HtreeNode<T> {
         if self.is_leaf() {
             if uuids.binary_search(&self.key).is_ok() {
                 return Ok(Self::default());
-            } else {
-                return Ok(self.clone());
             }
+
+            return Ok(self.clone());
         }
 
         let siblings = self.delete_leaves_recursive(&uuids, store)?;
@@ -125,23 +125,23 @@ impl<T> HtreeNode<T> {
 
         // Efficiently slice keys_to_delete using the sliding pivot approach.
         // We ignore keys smaller than the first child's key immediately.
-        let mut remaining_keys = if let Some(first) = children.first() {
-            &keys_to_delete[keys_to_delete.partition_point(|&k| k < first.key)..]
-        } else {
-            &[][..]
-        };
+        let mut remaining_keys = children.first().map_or_else(
+            || &[][..],
+            |first| &keys_to_delete[keys_to_delete.partition_point(|&k| k < first.key)..],
+        );
 
         let mut iter = children.into_iter().peekable();
         while let Some(node) = iter.next() {
             // Find the boundary: keys belonging to the current node are those
             // strictly less than the next sibling's key.
-            let (to_process, rest) = if let Some(next_sibling) = iter.peek() {
-                let mid = remaining_keys.partition_point(|&k| k < next_sibling.key);
-                remaining_keys.split_at(mid)
-            } else {
+            let (to_process, rest) = iter.peek().map_or_else(
                 // Last child consumes the remainder of relevant keys
-                (remaining_keys, &[][..])
-            };
+                || (remaining_keys, &[][..]),
+                |next_sibling| {
+                    let mid = remaining_keys.partition_point(|&k| k < next_sibling.key);
+                    remaining_keys.split_at(mid)
+                },
+            );
 
             if to_process.is_empty() {
                 rebuilt_children.push(node);
