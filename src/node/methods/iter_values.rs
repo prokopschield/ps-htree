@@ -36,15 +36,9 @@ impl<T: HtreeValue, S: Store> From<crate::HtreeNodeIterLeavesError<S>>
 {
     fn from(value: crate::HtreeNodeIterLeavesError<S>) -> Self {
         match value {
-            crate::HtreeNodeIterLeavesError::Store(err) => {
-                Self::Store(err)
-            }
-            crate::HtreeNodeIterLeavesError::CorruptedState => {
-                Self::CorruptedState
-            }
-            crate::HtreeNodeIterLeavesError::UnpackChildren(err) => {
-                Self::UnpackChildren(err)
-            }
+            crate::HtreeNodeIterLeavesError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterLeavesError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterLeavesError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }
