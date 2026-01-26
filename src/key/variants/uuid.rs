@@ -5,7 +5,7 @@ use crate::{HtreeKey, HtreeKeyError};
 
 impl HtreeKey for UUID {
     fn try_to_hkey<S: ps_hkey::Store>(&self, _: &S) -> Result<ps_hkey::Hkey, HtreeKeyError<S>> {
-        Ok(Hkey::Raw(self.as_bytes().as_slice().into()))
+        Hkey::from_raw(self.as_bytes().as_slice()).map_err(Into::into)
     }
 
     fn try_to_uuid<S: ps_hkey::Store>(&self, _: &S) -> Result<UUID, HtreeKeyError<S>> {

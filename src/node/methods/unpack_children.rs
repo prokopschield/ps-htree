@@ -1,4 +1,3 @@
-use ps_hash::HashValidationError;
 use ps_hkey::Hkey;
 use ps_rwt::RWT;
 use ps_util::Array;
@@ -63,7 +62,7 @@ impl<T> HtreeNode<T> {
                     .get(UUID_BYTES + 1..UUID_BYTES + 1 + child_hkey_len)
                     .ok_or(HtreeNodeUnpackChildrenError::UnexpectedEndOfInput)?,
             )
-            .map_err(HtreeNodeUnpackChildrenError::Hash)?;
+            .map_err(HtreeNodeUnpackChildrenError::HkeyFromCompact)?;
 
             remaining = &remaining[UUID_BYTES + 1 + child_hkey_len..];
 
@@ -86,7 +85,7 @@ impl<T> HtreeNode<T> {
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeUnpackChildrenError {
     #[error("Invalid Hash")]
-    Hash(#[from] HashValidationError),
+    HkeyFromCompact(#[from] ps_hkey::HkeyFromCompactError),
     #[error("The height of an inner node cannot be zero.")]
     HeightIsZero,
     #[error("Unexpected end of input")]

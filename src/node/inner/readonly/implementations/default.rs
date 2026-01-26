@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ps_hkey::Hkey;
 use ps_uuid::UUID;
 
@@ -10,7 +8,7 @@ impl Default for HtreeNodeReadonly {
         Self {
             height: 0,
             key: UUID::nil(),
-            hkey: Hkey::Raw(Arc::default()),
+            hkey: Hkey::Empty,
         }
     }
 }
