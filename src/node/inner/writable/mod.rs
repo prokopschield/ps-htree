@@ -1,11 +1,12 @@
-mod implementations;
-
 use crate::HtreeNode;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HtreeNodeWritable<T> {
+    #[default]
     Empty,
-    Internal { children: Vec<HtreeNode<T>> },
+    Internal {
+        children: Vec<HtreeNode<T>>,
+    },
     Leaf,
     Wrapped,
 }
