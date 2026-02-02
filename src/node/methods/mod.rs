@@ -17,6 +17,7 @@ mod is_leaf;
 mod iter_keys;
 mod iter_leaves;
 mod iter_values;
+mod last;
 mod resolve;
 mod select_child;
 mod select_child_range;
