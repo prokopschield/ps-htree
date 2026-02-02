@@ -1,4 +1,5 @@
 mod delete_many;
+mod delete_one;
 mod fetch_children;
 mod find_one;
 mod find_range;
@@ -25,6 +26,7 @@ mod upsert_many;
 mod upsert_one;
 
 pub use delete_many::HtreeNodeDeleteManyError;
+pub use delete_one::HtreeNodeDeleteOneError;
 pub use fetch_children::HtreeNodeFetchChildrenError;
 pub use find_one::HtreeNodeFindOneError;
 pub use find_range::HtreeNodeFindRangeError;
