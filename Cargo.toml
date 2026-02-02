@@ -20,6 +20,13 @@ default = []
 rkyv = ["dep:rkyv"]
 serde = ["dep:postcard", "dep:serde", "ps-uuid/serde"]
 
+[lints.clippy]
+expect_used = "warn"
+nursery = { level = "warn", priority = -1 }
+panic = "forbid"
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "forbid"
+
 [profile.dev]
 opt-level = 3
 
