@@ -4,6 +4,7 @@ mod delete_one;
 mod fetch_children;
 mod find_one;
 mod find_range;
+mod first;
 mod from_children;
 mod from_kvp;
 mod from_many_children;
