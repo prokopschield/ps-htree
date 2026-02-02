@@ -10,6 +10,7 @@ mod height;
 mod insert_leaves;
 mod insert_many;
 mod insert_one;
+mod is_empty;
 mod is_leaf;
 mod iter_leaves;
 mod iter_values;
