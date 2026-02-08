@@ -12,8 +12,8 @@ impl<T> HtreeNode<T> {
     /// Either half is `None` when it would contain no leaves.
     /// An empty tree always returns `(None, None)`.
     ///
-    /// Recursively descends the tree along the partition boundary and
-    /// reconstructs both halves with [`from_children`](Self::from_children).
+    /// This is a convenience wrapper around [`split`](Self::split) with the
+    /// predicate `|node| node.key >= key`.
     ///
     /// # Arguments
     ///
@@ -23,8 +23,7 @@ impl<T> HtreeNode<T> {
     /// # Errors
     ///
     /// - [`HtreeNodeSplitAtError::Key`] if key conversion to a UUID fails.
-    /// - [`HtreeNodeSplitAtError::FetchChildren`] if children cannot be fetched during traversal.
-    /// - [`HtreeNodeSplitAtError::FromChildren`] if reconstructing subtrees from children fails.
+    /// - [`HtreeNodeSplitAtError::Split`] if the underlying split operation fails.
     /// - [`HtreeNodeSplitAtError::Store`] if any store operation fails.
     ///
     /// # Examples
@@ -54,59 +53,18 @@ impl<T> HtreeNode<T> {
         key: &impl HtreeKey,
         store: &S,
     ) -> Result<(Option<Self>, Option<Self>), HtreeNodeSplitAtError<S>> {
-        if self.is_empty() {
-            return Ok((None, None));
-        }
-
         let key = key.try_to_uuid(store)?;
 
-        if self.is_leaf() {
-            return if self.key < key {
-                Ok((Some(self.clone()), None))
-            } else {
-                Ok((None, Some(self.clone())))
-            };
-        }
-
-        let mut children = self.fetch_children(store)?;
-
-        let partition_point = children.partition_point(|child| child.key < key);
-
-        // All children have keys >= split key; the entire node belongs to the greater side.
-        if partition_point == 0 {
-            return Ok((None, Some(self.clone())));
-        }
-
-        // Recursively split the boundary child (last child with key < split key).
-        let (lt, gt) = children[partition_point - 1].split_at(&key, store)?;
-
-        let greater = Self::from_children(
-            gt.into_iter().chain(children.drain(partition_point..)),
-            store,
-        )?;
-
-        // Remove the boundary child (used by the recursive split).
-        children.pop();
-
-        let lesser = Self::from_children(children.into_iter().chain(lt), store)?;
-
-        Ok((lesser.check_nonempty(), greater.check_nonempty()))
-    }
-
-    #[inline]
-    fn check_nonempty(self) -> Option<Self> {
-        if self.is_empty() { None } else { Some(self) }
+        Ok(self.split(&|node| node.key >= key, store)?)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeSplitAtError<S: Store> {
-    #[error("Fetch children error: {0}")]
-    FetchChildren(crate::HtreeNodeFetchChildrenError<S>),
-    #[error("from_children error: {0}")]
-    FromChildren(crate::HtreeNodeFromChildrenError<S>),
     #[error("Key conversion error: {0}")]
     Key(crate::HtreeKeyError<S>),
+    #[error(transparent)]
+    Split(crate::HtreeNodeSplitError<S>),
     #[error("Store error: {0}")]
     Store(S::Error),
 }
@@ -121,20 +79,11 @@ impl<S: Store> From<crate::HtreeKeyError<S>> for HtreeNodeSplitAtError<S> {
     }
 }
 
-impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeSplitAtError<S> {
-    fn from(value: crate::HtreeNodeFetchChildrenError<S>) -> Self {
+impl<S: Store> From<crate::HtreeNodeSplitError<S>> for HtreeNodeSplitAtError<S> {
+    fn from(value: crate::HtreeNodeSplitError<S>) -> Self {
         match value {
-            crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
-            err => Self::FetchChildren(err),
-        }
-    }
-}
-
-impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodeSplitAtError<S> {
-    fn from(value: crate::HtreeNodeFromChildrenError<S>) -> Self {
-        match value {
-            crate::HtreeNodeFromChildrenError::Store(err) => Self::Store(err),
-            err => Self::FromChildren(err),
+            crate::HtreeNodeSplitError::Store(err) => Self::Store(err),
+            err => Self::Split(err),
         }
     }
 }
