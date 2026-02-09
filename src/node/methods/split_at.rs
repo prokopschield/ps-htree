@@ -13,7 +13,7 @@ impl<T> HtreeNode<T> {
     /// An empty tree always returns `(None, None)`.
     ///
     /// This is a convenience wrapper around [`split`](Self::split) with the
-    /// predicate `|node| node.key >= key`.
+    /// predicate `|node| node.key < key`.
     ///
     /// # Arguments
     ///
@@ -55,7 +55,7 @@ impl<T> HtreeNode<T> {
     ) -> Result<(Option<Self>, Option<Self>), HtreeNodeSplitAtError<S>> {
         let key = key.try_to_uuid(store)?;
 
-        Ok(self.split(&|node| node.key >= key, store)?)
+        Ok(self.split(&|node| node.key < key, store)?)
     }
 }
 
