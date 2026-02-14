@@ -36,35 +36,59 @@ impl<T> HtreeNode<T> {
     {
         let mut children: Vec<Self> = children.into_iter().collect();
 
-        if children.is_empty() {
-            // return an empty node
-            return Ok(Self::default());
-        }
-
         children.sort();
 
-        let first_height = children[0].height;
-
-        if children.some(|child| child.height != first_height) {
-            return Err(HtreeNodeFromChildrenError::ChildHeightInconsistent);
-        }
-
-        let Some(height) = first_height.checked_add(1) else {
-            return Err(HtreeNodeFromChildrenError::HeightOverflow);
-        };
-
-        let key = children[0].key;
-        let hkey = store
-            .put(&serialize_children(&children, store)?)
-            .map_err(HtreeNodeFromChildrenError::Store)?;
-
-        Ok(Self {
-            inner: RWT::new(
-                HtreeNodeReadonly { key, height, hkey },
-                HtreeNodeWritable::Internal { children },
-            ),
-        })
+        build_parent_from_sorted_children(children, store)
     }
+
+    /// Constructs a parent node from children that are already sorted by key.
+    ///
+    /// Internal helper for callers that have already established ordering and
+    /// want to avoid redundant sorting.
+    pub(crate) fn from_sorted_children<I, S>(
+        children: I,
+        store: &S,
+    ) -> Result<Self, HtreeNodeFromChildrenError<S>>
+    where
+        I: IntoIterator<Item = Self>,
+        S: Store,
+    {
+        let children: Vec<Self> = children.into_iter().collect();
+
+        build_parent_from_sorted_children(children, store)
+    }
+}
+
+fn build_parent_from_sorted_children<T, S: Store>(
+    children: Vec<HtreeNode<T>>,
+    store: &S,
+) -> Result<HtreeNode<T>, HtreeNodeFromChildrenError<S>> {
+    if children.is_empty() {
+        // return an empty node
+        return Ok(HtreeNode::default());
+    }
+
+    let first_height = children[0].height;
+
+    if children.some(|child| child.height != first_height) {
+        return Err(HtreeNodeFromChildrenError::ChildHeightInconsistent);
+    }
+
+    let Some(height) = first_height.checked_add(1) else {
+        return Err(HtreeNodeFromChildrenError::HeightOverflow);
+    };
+
+    let key = children[0].key;
+    let hkey = store
+        .put(&serialize_children(&children, store)?)
+        .map_err(HtreeNodeFromChildrenError::Store)?;
+
+    Ok(HtreeNode {
+        inner: RWT::new(
+            HtreeNodeReadonly { key, height, hkey },
+            HtreeNodeWritable::Internal { children },
+        ),
+    })
 }
 
 /// Serializes child nodes into a buffer for storage.
