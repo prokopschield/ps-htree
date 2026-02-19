@@ -81,7 +81,7 @@ impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeIterLeav
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
 mod tests {
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
@@ -102,9 +102,13 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4();
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
 
-        let leaves: Vec<_> = tree.iter_leaves(&store).map(|r| r.unwrap()).collect();
+        let leaves: Vec<_> = tree
+            .iter_leaves(&store)
+            .map(|r| r.expect("iter_leaves should not fail"))
+            .collect();
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].key, key);
     }
@@ -116,23 +120,29 @@ mod tests {
         let key2 = UUID::gen_v4();
         let key3 = UUID::gen_v4();
 
-        let leaf1 = HtreeNode::<u64>::from_kvp(&key1, &1, &store).unwrap();
-        let leaf2 = HtreeNode::<u64>::from_kvp(&key2, &2, &store).unwrap();
-        let leaf3 = HtreeNode::<u64>::from_kvp(&key3, &3, &store).unwrap();
+        let leaf1 =
+            HtreeNode::<u64>::from_kvp(&key1, &1, &store).expect("from_kvp should create leaf1");
+        let leaf2 =
+            HtreeNode::<u64>::from_kvp(&key2, &2, &store).expect("from_kvp should create leaf2");
+        let leaf3 =
+            HtreeNode::<u64>::from_kvp(&key3, &3, &store).expect("from_kvp should create leaf3");
 
         let tree = HtreeNode::from_many_children([leaf1, leaf2, leaf3], &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        let leaves: Vec<_> = tree.iter_leaves(&store).map(|r| r.unwrap()).collect();
+        let leaves: Vec<_> = tree
+            .iter_leaves(&store)
+            .map(|r| r.expect("iter_leaves should not fail"))
+            .collect();
         assert_eq!(leaves.len(), 3);
 
-        let keys: Vec<_> = leaves.iter().map(|l| l.key).collect();
-        assert!(keys.contains(&key1));
-        assert!(keys.contains(&key2));
-        assert!(keys.contains(&key3));
+        let collected_keys: Vec<_> = leaves.iter().map(|l| l.key).collect();
+        assert!(collected_keys.contains(&key1));
+        assert!(collected_keys.contains(&key2));
+        assert!(collected_keys.contains(&key3));
     }
 
     #[test]
@@ -144,16 +154,22 @@ mod tests {
         let leaves: Vec<_> = original_keys
             .iter()
             .enumerate()
-            .map(|(i, k)| HtreeNode::<u64>::from_kvp(k, &(i as u64), &store).unwrap())
+            .map(|(i, k)| {
+                HtreeNode::<u64>::from_kvp(k, &(i as u64), &store)
+                    .expect("from_kvp should create leaf node")
+            })
             .collect();
 
         let tree = HtreeNode::from_many_children(leaves, &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        let keys: Vec<_> = tree.iter_leaves(&store).map(|r| r.unwrap().key).collect();
+        let keys: Vec<_> = tree
+            .iter_leaves(&store)
+            .map(|r| r.expect("iter_leaves should not fail").key)
+            .collect();
 
         let mut sorted_keys = keys.clone();
         sorted_keys.sort();

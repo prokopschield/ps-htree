@@ -26,7 +26,7 @@ impl<T> HtreeNode<T> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
 mod tests {
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
@@ -44,7 +44,8 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
         assert!(!tree.is_empty());
     }
 
@@ -54,14 +55,16 @@ mod tests {
         let key1 = UUID::gen_v4().with_version(8);
         let key2 = UUID::gen_v4().with_version(8);
 
-        let leaf1 = HtreeNode::<u64>::from_kvp(&key1, &1, &store).unwrap();
-        let leaf2 = HtreeNode::<u64>::from_kvp(&key2, &2, &store).unwrap();
+        let leaf1 =
+            HtreeNode::<u64>::from_kvp(&key1, &1, &store).expect("from_kvp should create leaf1");
+        let leaf2 =
+            HtreeNode::<u64>::from_kvp(&key2, &2, &store).expect("from_kvp should create leaf2");
 
         let tree = HtreeNode::from_many_children([leaf1, leaf2], &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
         assert!(!tree.is_empty());
     }
@@ -71,10 +74,13 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
         assert!(!tree.is_empty());
 
-        let tree = tree.delete_one(&key, &store).unwrap();
+        let tree = tree
+            .delete_one(&key, &store)
+            .expect("delete_one should succeed");
         assert!(tree.is_empty());
     }
 
@@ -84,16 +90,20 @@ mod tests {
         let key1 = UUID::gen_v4().with_version(8);
         let key2 = UUID::gen_v4().with_version(8);
 
-        let leaf1 = HtreeNode::<u64>::from_kvp(&key1, &1, &store).unwrap();
-        let leaf2 = HtreeNode::<u64>::from_kvp(&key2, &2, &store).unwrap();
+        let leaf1 =
+            HtreeNode::<u64>::from_kvp(&key1, &1, &store).expect("from_kvp should create leaf1");
+        let leaf2 =
+            HtreeNode::<u64>::from_kvp(&key2, &2, &store).expect("from_kvp should create leaf2");
 
         let tree = HtreeNode::from_many_children([leaf1, leaf2], &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        let tree = tree.delete_one(&key1, &store).unwrap();
+        let tree = tree
+            .delete_one(&key1, &store)
+            .expect("delete_one should succeed");
         assert!(!tree.is_empty());
     }
 }

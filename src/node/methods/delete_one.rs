@@ -46,7 +46,7 @@ impl<S: Store> From<crate::HtreeNodeDeleteManyError<S>> for HtreeNodeDeleteOneEr
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
 mod tests {
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
@@ -58,11 +58,22 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
-        assert!(tree.find_one(&key, &store).unwrap().is_some());
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
+        assert!(
+            tree.find_one(&key, &store)
+                .expect("find_one should succeed")
+                .is_some()
+        );
 
-        let tree = tree.delete_one(&key, &store).unwrap();
-        assert!(tree.find_one(&key, &store).unwrap().is_none());
+        let tree = tree
+            .delete_one(&key, &store)
+            .expect("delete_one should succeed");
+        assert!(
+            tree.find_one(&key, &store)
+                .expect("find_one should succeed after deletion")
+                .is_none()
+        );
     }
 
     #[test]
@@ -71,13 +82,21 @@ mod tests {
         let key1 = UUID::gen_v4().with_version(8);
         let key2 = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key1, &42, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key1, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
         let tree_before = tree.clone();
 
-        let tree_after = tree.delete_one(&key2, &store).unwrap();
+        let tree_after = tree
+            .delete_one(&key2, &store)
+            .expect("delete_one should succeed even for nonexistent key");
 
         assert_eq!(tree_before.hkey, tree_after.hkey);
-        assert!(tree_after.find_one(&key1, &store).unwrap().is_some());
+        assert!(
+            tree_after
+                .find_one(&key1, &store)
+                .expect("find_one should succeed")
+                .is_some()
+        );
     }
 
     #[test]
@@ -87,25 +106,54 @@ mod tests {
         let key2 = UUID::gen_v4().with_version(8);
         let key3 = UUID::gen_v4().with_version(8);
 
-        let leaf1 = HtreeNode::<u64>::from_kvp(&key1, &1, &store).unwrap();
-        let leaf2 = HtreeNode::<u64>::from_kvp(&key2, &2, &store).unwrap();
-        let leaf3 = HtreeNode::<u64>::from_kvp(&key3, &3, &store).unwrap();
+        let leaf1 =
+            HtreeNode::<u64>::from_kvp(&key1, &1, &store).expect("from_kvp should create leaf1");
+        let leaf2 =
+            HtreeNode::<u64>::from_kvp(&key2, &2, &store).expect("from_kvp should create leaf2");
+        let leaf3 =
+            HtreeNode::<u64>::from_kvp(&key3, &3, &store).expect("from_kvp should create leaf3");
 
         let tree = HtreeNode::from_many_children([leaf1, leaf2, leaf3], &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        assert!(tree.find_one(&key1, &store).unwrap().is_some());
-        assert!(tree.find_one(&key2, &store).unwrap().is_some());
-        assert!(tree.find_one(&key3, &store).unwrap().is_some());
+        assert!(
+            tree.find_one(&key1, &store)
+                .expect("find_one should find key1")
+                .is_some()
+        );
+        assert!(
+            tree.find_one(&key2, &store)
+                .expect("find_one should find key2")
+                .is_some()
+        );
+        assert!(
+            tree.find_one(&key3, &store)
+                .expect("find_one should find key3")
+                .is_some()
+        );
 
-        let tree = tree.delete_one(&key2, &store).unwrap();
+        let tree = tree
+            .delete_one(&key2, &store)
+            .expect("delete_one should succeed");
 
-        assert!(tree.find_one(&key1, &store).unwrap().is_some());
-        assert!(tree.find_one(&key2, &store).unwrap().is_none());
-        assert!(tree.find_one(&key3, &store).unwrap().is_some());
+        assert!(
+            tree.find_one(&key1, &store)
+                .expect("find_one should still find key1")
+                .is_some()
+        );
+        assert!(
+            tree.find_one(&key2, &store)
+                .expect("find_one should succeed but return None for deleted key2")
+                .is_none()
+        );
+        assert!(
+            tree.find_one(&key3, &store)
+                .expect("find_one should still find key3")
+                .is_some()
+        );
     }
 
     #[test]
@@ -113,8 +161,11 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
-        let tree = tree.delete_one(&key, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
+        let tree = tree
+            .delete_one(&key, &store)
+            .expect("delete_one should succeed");
 
         assert_eq!(tree, HtreeNode::default());
     }
@@ -124,9 +175,14 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
-        let tree = tree.delete_one(&key, &store).unwrap();
-        let tree = tree.delete_one(&key, &store).unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
+        let tree = tree
+            .delete_one(&key, &store)
+            .expect("first delete_one should succeed");
+        let tree = tree
+            .delete_one(&key, &store)
+            .expect("second delete_one should succeed (idempotent)");
 
         assert_eq!(tree, HtreeNode::default());
     }

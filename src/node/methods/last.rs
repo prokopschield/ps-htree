@@ -60,7 +60,7 @@ impl<T> HtreeNode<T> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
 mod tests {
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
@@ -71,7 +71,11 @@ mod tests {
     fn empty_tree_returns_none() {
         let store = InMemoryStore::default();
         let tree: HtreeNode<()> = HtreeNode::default();
-        assert!(tree.last(&store).unwrap().is_none());
+        assert!(
+            tree.last(&store)
+                .expect("last should not fail on empty tree")
+                .is_none()
+        );
     }
 
     #[test]
@@ -79,8 +83,12 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
-        let last = tree.last(&store).unwrap().unwrap();
+        let tree = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
+        let last = tree
+            .last(&store)
+            .expect("last should succeed on single leaf tree")
+            .expect("last should return Some for non-empty tree");
 
         assert_eq!(last.key, key);
         assert!(last.is_leaf());
@@ -92,16 +100,21 @@ mod tests {
         let key1 = UUID::gen_v4().with_version(8);
         let key2 = UUID::gen_v4().with_version(8);
 
-        let leaf1 = HtreeNode::<u64>::from_kvp(&key1, &1, &store).unwrap();
-        let leaf2 = HtreeNode::<u64>::from_kvp(&key2, &2, &store).unwrap();
+        let leaf1 =
+            HtreeNode::<u64>::from_kvp(&key1, &1, &store).expect("from_kvp should create leaf1");
+        let leaf2 =
+            HtreeNode::<u64>::from_kvp(&key2, &2, &store).expect("from_kvp should create leaf2");
 
         let tree = HtreeNode::from_many_children([leaf1, leaf2], &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        let last = tree.last(&store).unwrap().unwrap();
+        let last = tree
+            .last(&store)
+            .expect("last should succeed")
+            .expect("last should return Some for non-empty tree");
         let expected_key = std::cmp::max(key1, key2);
 
         assert_eq!(last.key, expected_key);
@@ -117,17 +130,23 @@ mod tests {
         let leaves: Vec<_> = keys
             .iter()
             .enumerate()
-            .map(|(i, k)| HtreeNode::<u64>::from_kvp(k, &(i as u64), &store).unwrap())
+            .map(|(i, k)| {
+                HtreeNode::<u64>::from_kvp(k, &(i as u64), &store)
+                    .expect("from_kvp should create leaf node")
+            })
             .collect();
 
         let tree = HtreeNode::from_many_children(leaves, &store)
-            .unwrap()
+            .expect("from_many_children should build tree from leaves")
             .into_iter()
             .next()
-            .unwrap();
+            .expect("from_many_children should return at least one root node");
 
-        let last = tree.last(&store).unwrap().unwrap();
-        let expected_key = *keys.iter().max().unwrap();
+        let last = tree
+            .last(&store)
+            .expect("last should succeed")
+            .expect("last should return Some for non-empty tree");
+        let expected_key = *keys.iter().max().expect("keys vector should not be empty");
 
         assert_eq!(last.key, expected_key);
         assert!(last.is_leaf());
@@ -138,10 +157,14 @@ mod tests {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4().with_version(8);
 
-        let leaf = HtreeNode::<u64>::from_kvp(&key, &42, &store).unwrap();
+        let leaf = HtreeNode::<u64>::from_kvp(&key, &42, &store)
+            .expect("from_kvp should create a valid leaf node");
         assert!(leaf.is_leaf());
 
-        let last = leaf.last(&store).unwrap().unwrap();
+        let last = leaf
+            .last(&store)
+            .expect("last should succeed")
+            .expect("last should return Some for non-empty tree");
         assert_eq!(last.key, leaf.key);
     }
 }

@@ -161,7 +161,7 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
 mod tests {
     use std::collections::HashMap;
 
@@ -173,7 +173,7 @@ mod tests {
     // ==================== Helper functions ====================
 
     fn make_leaf(key: &UUID, value: u64, store: &InMemoryStore) -> HtreeNode<u64> {
-        HtreeNode::from_kvp(key, &value, store).unwrap()
+        HtreeNode::from_kvp(key, &value, store).expect("from_kvp should create a valid leaf node")
     }
 
     fn sorted_keys(n: usize) -> Vec<UUID> {
@@ -183,7 +183,10 @@ mod tests {
     }
 
     fn count_children(parent: &HtreeNode<u64>, store: &InMemoryStore) -> usize {
-        parent.fetch_children(store).unwrap().len()
+        parent
+            .fetch_children(store)
+            .expect("fetch_children should succeed")
+            .len()
     }
 
     fn total_children(parents: &[HtreeNode<u64>], store: &InMemoryStore) -> usize {
@@ -210,13 +213,16 @@ mod tests {
     }
 
     /// Verifies that no key appears in multiple non-consecutive parent nodes.
-    /// Keys may span multiple consecutive parents (when > MAX_CHILDREN), but must be contiguous.
+    /// Keys may span multiple consecutive parents (when > `MAX_CHILDREN`), but must be contiguous.
     fn assert_keys_contiguous(parents: &[HtreeNode<u64>], store: &InMemoryStore) {
         // Track the range of parent indices where each key appears
         let mut key_ranges: HashMap<UUID, (usize, usize)> = HashMap::new();
 
         for (idx, parent) in parents.iter().enumerate() {
-            for child in parent.fetch_children(store).unwrap() {
+            for child in parent
+                .fetch_children(store)
+                .expect("fetch_children should succeed")
+            {
                 key_ranges
                     .entry(child.key)
                     .and_modify(|(_, end)| *end = idx)
@@ -226,31 +232,34 @@ mod tests {
 
         // Verify each key only appears in its declared range
         for (idx, parent) in parents.iter().enumerate() {
-            for child in parent.fetch_children(store).unwrap() {
+            for child in parent
+                .fetch_children(store)
+                .expect("fetch_children should succeed")
+            {
                 let (start, end) = key_ranges[&child.key];
                 assert!(
                     idx >= start && idx <= end,
-                    "Key {:?} appears in parent {} but range is [{}, {}]",
+                    "Key {:?} appears in parent {idx} but range is [{start}, {end}]",
                     child.key,
-                    idx,
-                    start,
-                    end
                 );
             }
         }
     }
 
     /// Verifies that no key appears in multiple parent nodes (strict version).
-    /// Use this only when each key has <= MAX_CHILDREN children.
+    /// Use this only when each key has <= `MAX_CHILDREN` children.
     fn assert_keys_not_split(parents: &[HtreeNode<u64>], store: &InMemoryStore) {
         let mut key_to_parent: HashMap<UUID, usize> = HashMap::new();
         for (idx, parent) in parents.iter().enumerate() {
-            for child in parent.fetch_children(store).unwrap() {
+            for child in parent
+                .fetch_children(store)
+                .expect("fetch_children should succeed")
+            {
                 if let Some(&prev_idx) = key_to_parent.get(&child.key) {
                     assert_eq!(
                         prev_idx, idx,
-                        "Key {:?} split across parent {} and {}",
-                        child.key, prev_idx, idx
+                        "Key {:?} split across parent {prev_idx} and {idx}",
+                        child.key,
                     );
                 }
                 key_to_parent.insert(child.key, idx);
@@ -258,16 +267,13 @@ mod tests {
         }
     }
 
-    /// Verifies all parents have at most MAX_CHILDREN.
+    /// Verifies all parents have at most `MAX_CHILDREN`.
     fn assert_max_children_respected(parents: &[HtreeNode<u64>], store: &InMemoryStore) {
         for (i, parent) in parents.iter().enumerate() {
             let count = count_children(parent, store);
             assert!(
                 count <= MAX_CHILDREN,
-                "Parent {} has {} children, expected <= {}",
-                i,
-                count,
-                MAX_CHILDREN
+                "Parent {i} has {count} children, expected <= {MAX_CHILDREN}",
             );
         }
     }
@@ -278,7 +284,8 @@ mod tests {
     fn empty_children_returns_empty() {
         let store = InMemoryStore::default();
         let children: Vec<HtreeNode<u64>> = Vec::new();
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
         assert!(parents.is_empty());
     }
 
@@ -288,7 +295,8 @@ mod tests {
         let key = UUID::gen_v4();
         let children = vec![make_leaf(&key, 1, &store)];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 1);
@@ -300,7 +308,8 @@ mod tests {
         let key = UUID::gen_v4();
         let children = vec![make_leaf(&key, 1, &store), make_leaf(&key, 2, &store)];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 2);
@@ -315,7 +324,8 @@ mod tests {
             make_leaf(&keys[1], 2, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 2);
@@ -331,7 +341,8 @@ mod tests {
             make_leaf(&key, 3, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -347,7 +358,8 @@ mod tests {
             make_leaf(&keys[2], 3, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -365,7 +377,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(
             parents.len(),
@@ -383,7 +396,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(
             parents.len(),
@@ -403,7 +417,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(
             parents.len(),
@@ -426,7 +441,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(
             parents.len(),
@@ -450,7 +466,8 @@ mod tests {
             make_leaf(&keys[1], 2, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -468,7 +485,8 @@ mod tests {
             make_leaf(&keys[1], 2, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -488,7 +506,8 @@ mod tests {
             children.push(make_leaf(key, i as u64, &store));
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -508,7 +527,8 @@ mod tests {
             children.push(make_leaf(key, (i + 10) as u64, &store));
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -529,7 +549,8 @@ mod tests {
         }
 
         let num_children = children.len();
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -547,7 +568,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 2);
         assert_eq!(total_children(&parents, &store), num);
@@ -562,7 +584,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         let expected_groups = num.div_ceil(MAX_CHILDREN);
         assert_eq!(parents.len(), expected_groups);
@@ -582,7 +605,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), num.div_ceil(MAX_CHILDREN));
         assert_eq!(
@@ -604,7 +628,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), num.div_ceil(MAX_CHILDREN));
         assert_eq!(
@@ -634,7 +659,8 @@ mod tests {
         }
 
         assert!(children.len() <= MAX_CHILDREN);
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 7);
@@ -653,7 +679,8 @@ mod tests {
             }
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -673,7 +700,8 @@ mod tests {
             .map(|i| make_leaf(&keys[i % num_unique_keys], i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
     }
@@ -697,11 +725,15 @@ mod tests {
             })
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         let mut actual_key_counts: HashMap<UUID, usize> = HashMap::new();
         for parent in &parents {
-            for child in parent.fetch_children(&store).unwrap() {
+            for child in parent
+                .fetch_children(&store)
+                .expect("fetch_children should succeed")
+            {
                 *actual_key_counts.entry(child.key).or_insert(0) += 1;
             }
         }
@@ -724,7 +756,8 @@ mod tests {
             .collect();
         children.reverse();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Each parent's key should be <= the next parent's key
         for i in 1..parents.len() {
@@ -749,10 +782,13 @@ mod tests {
             .collect();
         children.reverse();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         for parent in &parents {
-            let children = parent.fetch_children(&store).unwrap();
+            let children = parent
+                .fetch_children(&store)
+                .expect("fetch_children should succeed");
             for i in 1..children.len() {
                 assert!(
                     children[i - 1].key <= children[i].key,
@@ -780,7 +816,8 @@ mod tests {
             children.push(make_leaf(key, (i + 1000) as u64, &store));
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -796,12 +833,13 @@ mod tests {
         for (i, key) in keys.iter().enumerate().take(keys.len() - 1) {
             children.push(make_leaf(key, i as u64, &store));
         }
-        let last_key = keys.last().unwrap();
+        let last_key = keys.last().expect("keys should not be empty");
         for i in 0..MAX_CHILDREN {
             children.push(make_leaf(last_key, (i + 1000) as u64, &store));
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -827,7 +865,8 @@ mod tests {
             children.push(make_leaf(&keys[2], (i + 2000) as u64, &store));
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_keys_not_split(&parents, &store);
         assert_max_children_respected(&parents, &store);
@@ -846,7 +885,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num);
         assert_max_children_respected(&parents, &store);
@@ -861,7 +901,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         let expected_groups = num.div_ceil(MAX_CHILDREN);
         assert_eq!(parents.len(), expected_groups);
@@ -880,7 +921,8 @@ mod tests {
             .map(|i| make_leaf(&keys[i % num_unique_keys], i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_contiguous(&parents, &store);
@@ -903,7 +945,8 @@ mod tests {
         }
 
         let num_children = children.len();
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -928,7 +971,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, 50_000);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_contiguous(&parents, &store);
@@ -955,7 +999,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, 15_000);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -975,7 +1020,8 @@ mod tests {
             make_leaf(&keys[1], 2, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -992,7 +1038,8 @@ mod tests {
             make_leaf(&keys[1], 2, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 3);
@@ -1010,7 +1057,8 @@ mod tests {
             make_leaf(&keys[1], 3, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 4);
@@ -1028,7 +1076,8 @@ mod tests {
             make_leaf(&keys[1], 3, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 4);
@@ -1048,7 +1097,8 @@ mod tests {
             make_leaf(&keys[2], 4, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 5);
@@ -1072,7 +1122,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 2);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1097,7 +1148,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1121,7 +1173,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 1);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1140,7 +1193,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split into exactly 2 groups
         assert_eq!(parents.len(), 2);
@@ -1162,7 +1216,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split into 3 groups with even distribution
         assert_eq!(parents.len(), 3);
@@ -1181,7 +1236,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), MAX_CHILDREN);
@@ -1195,7 +1251,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split evenly
         assert_eq!(parents.len(), 2);
@@ -1213,7 +1270,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 2);
         assert_eq!(
@@ -1241,7 +1299,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1263,7 +1322,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1285,7 +1345,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1316,7 +1377,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 2);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1337,7 +1399,8 @@ mod tests {
             .collect();
         children.reverse();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num);
         assert_max_children_respected(&parents, &store);
@@ -1365,7 +1428,8 @@ mod tests {
             }
         }
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num);
         assert_keys_not_split(&parents, &store);
@@ -1382,7 +1446,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         let expected_groups = num.div_ceil(MAX_CHILDREN);
         assert_eq!(parents.len(), expected_groups);
@@ -1403,7 +1468,8 @@ mod tests {
             make_leaf(&keys[2], 4, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 5);
@@ -1425,7 +1491,8 @@ mod tests {
             make_leaf(&keys[2], 6, &store),
         ];
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), 7);
@@ -1444,7 +1511,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num);
         assert_max_children_respected(&parents, &store);
@@ -1462,7 +1530,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), num);
@@ -1480,7 +1549,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
         assert_eq!(count_children(&parents[0], &store), num);
@@ -1504,7 +1574,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1523,11 +1594,18 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         for parent in &parents {
-            let children = parent.fetch_children(&store).unwrap();
-            let min_child_key = children.iter().map(|c| c.key).min().unwrap();
+            let children = parent
+                .fetch_children(&store)
+                .expect("fetch_children should succeed");
+            let min_child_key = children
+                .iter()
+                .map(|c| c.key)
+                .min()
+                .expect("children should not be empty");
             assert_eq!(
                 parent.key, min_child_key,
                 "Parent key should be minimum child key"
@@ -1547,7 +1625,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // All parents should have height 1 (leaves are height 0)
         for parent in &parents {
@@ -1572,7 +1651,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_contiguous(&parents, &store);
@@ -1598,7 +1678,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 1);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1619,7 +1700,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1641,7 +1723,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         // Use assert_keys_contiguous because key[0] has > MAX_CHILDREN children
@@ -1670,7 +1753,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1695,7 +1779,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1724,7 +1809,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1753,7 +1839,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1778,7 +1865,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1802,7 +1890,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1831,7 +1920,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1850,7 +1940,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         for (i, parent) in parents.iter().enumerate() {
             let count = count_children(parent, &store);
@@ -1872,12 +1963,16 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Collect all child values
         let mut all_values: Vec<u64> = Vec::new();
         for parent in &parents {
-            for child in parent.fetch_children(&store).unwrap() {
+            for child in parent
+                .fetch_children(&store)
+                .expect("fetch_children should succeed")
+            {
                 // Extract value by re-fetching
                 all_values.push(child.key.as_bytes()[0] as u64); // Using key as proxy
             }
@@ -1897,7 +1992,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split into 2 groups with even distribution
         assert_eq!(parents.len(), 2);
@@ -1915,7 +2011,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split into exactly 2 groups of MAX_CHILDREN each
         assert_eq!(parents.len(), 2);
@@ -1935,7 +2032,8 @@ mod tests {
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         // Should split into 3 groups with even distribution
         assert_eq!(parents.len(), 3);
@@ -1965,7 +2063,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 1);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -1991,7 +2090,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         // key[0] will span multiple parents (> MAX_CHILDREN)
@@ -2016,7 +2116,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2041,7 +2142,8 @@ mod tests {
         let num_children = children.len();
         assert_eq!(num_children, MAX_CHILDREN + 1);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2072,7 +2174,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2097,7 +2200,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2122,7 +2226,8 @@ mod tests {
         let num_children = children.len();
         assert!(num_children > MAX_CHILDREN);
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2147,7 +2252,8 @@ mod tests {
 
         let num_children = children.len();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), num_children);
         assert_keys_not_split(&parents, &store);
@@ -2165,7 +2271,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), MAX_CHILDREN + 1);
         assert_eq!(parents.len(), 2);
@@ -2183,7 +2290,8 @@ mod tests {
             .map(|(i, k)| make_leaf(k, i as u64, &store))
             .collect();
 
-        let parents = HtreeNode::from_many_children(children, &store).unwrap();
+        let parents = HtreeNode::from_many_children(children, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(total_children(&parents, &store), MAX_CHILDREN);
         assert_eq!(parents.len(), 1);
@@ -2195,7 +2303,7 @@ mod tests {
 
     /// Creates an internal node (height 1) containing the given leaves.
     fn make_internal_node(leaves: Vec<HtreeNode<u64>>, store: &InMemoryStore) -> HtreeNode<u64> {
-        HtreeNode::from_children(leaves, store).unwrap()
+        HtreeNode::from_children(leaves, store).expect("from_children should succeed")
     }
 
     #[test]
@@ -2233,15 +2341,18 @@ mod tests {
         let hkey2 = subtree2.hkey.clone();
         let hkey3 = subtree3.hkey.clone();
 
-        let subtrees = vec![subtree1, subtree2, subtree3];
-        let parents = HtreeNode::from_many_children(subtrees, &store).unwrap();
+        let all_subtrees = vec![subtree1, subtree2, subtree3];
+        let parents = HtreeNode::from_many_children(all_subtrees, &store)
+            .expect("from_many_children should succeed");
 
         // Should create one parent containing all 3 subtrees
         assert_eq!(parents.len(), 1);
         assert_eq!(parents[0].height, 2); // Parent of height-1 nodes
 
         // Verify the subtrees are passed through with same hkeys
-        let children = parents[0].fetch_children(&store).unwrap();
+        let children = parents[0]
+            .fetch_children(&store)
+            .expect("fetch_children should succeed");
         assert_eq!(children.len(), 3);
 
         // The hkeys should be unchanged - subtrees were not reconstructed
@@ -2273,7 +2384,8 @@ mod tests {
             subtrees.push(subtree);
         }
 
-        let parents = HtreeNode::from_many_children(subtrees, &store).unwrap();
+        let parents = HtreeNode::from_many_children(subtrees, &store)
+            .expect("from_many_children should succeed");
 
         // Should create 2 parents (since > MAX_CHILDREN subtrees)
         assert_eq!(parents.len(), 2);
@@ -2283,7 +2395,10 @@ mod tests {
         // Collect all child hkeys from both parents
         let mut result_hkeys = Vec::new();
         for parent in &parents {
-            for child in parent.fetch_children(&store).unwrap() {
+            for child in parent
+                .fetch_children(&store)
+                .expect("fetch_children should succeed")
+            {
                 result_hkeys.push(child.hkey.clone());
             }
         }
@@ -2321,20 +2436,25 @@ mod tests {
             &store,
         );
 
-        let subtrees = vec![subtree1, subtree2];
-        let parents = HtreeNode::from_many_children(subtrees, &store).unwrap();
+        let all_subtrees = vec![subtree1, subtree2];
+        let parents = HtreeNode::from_many_children(all_subtrees, &store)
+            .expect("from_many_children should succeed");
 
         assert_eq!(parents.len(), 1);
 
         // Fetch the subtrees from the parent
-        let children = parents[0].fetch_children(&store).unwrap();
+        let children = parents[0]
+            .fetch_children(&store)
+            .expect("fetch_children should succeed");
         assert_eq!(children.len(), 2);
 
         // Verify we can still traverse into the subtrees and get the original leaves
         let mut all_leaf_keys: Vec<UUID> = Vec::new();
         for subtree in &children {
             assert_eq!(subtree.height, 1); // Subtrees should be height 1
-            let leaves = subtree.fetch_children(&store).unwrap();
+            let leaves = subtree
+                .fetch_children(&store)
+                .expect("fetch_children should succeed");
             for leaf in leaves {
                 all_leaf_keys.push(leaf.key);
             }
@@ -2375,13 +2495,16 @@ mod tests {
             subtrees.push(subtree);
         }
 
-        let parents = HtreeNode::from_many_children(subtrees, &store).unwrap();
+        let parents = HtreeNode::from_many_children(subtrees, &store)
+            .expect("from_many_children should succeed");
 
         // All 7 subtrees fit in one parent
         assert_eq!(parents.len(), 1);
 
         // Verify keys are not split
-        let children = parents[0].fetch_children(&store).unwrap();
+        let children = parents[0]
+            .fetch_children(&store)
+            .expect("fetch_children should succeed");
         assert_eq!(children.len(), 7);
 
         // Count subtrees per key
@@ -2414,7 +2537,8 @@ mod tests {
         );
 
         // Create height-2 node containing the height-1 nodes
-        let deep_subtree = HtreeNode::from_children(vec![internal1, internal2], &store).unwrap();
+        let deep_subtree = HtreeNode::from_children(vec![internal1, internal2], &store)
+            .expect("from_children should succeed");
         assert_eq!(deep_subtree.height, 2);
 
         // Create another simple subtree
@@ -2454,7 +2578,8 @@ mod tests {
             subtrees.push(subtree);
         }
 
-        let parents = HtreeNode::from_many_children(subtrees, &store).unwrap();
+        let parents = HtreeNode::from_many_children(subtrees, &store)
+            .expect("from_many_children should succeed");
 
         // Should succeed and create 2 parents
         assert_eq!(parents.len(), 2);
