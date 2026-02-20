@@ -15,6 +15,9 @@ rkyv = { version = "0.8", optional = true }
 serde = { version = "1.0", optional = true }
 thiserror = "2.0.18"
 
+[dev-dependencies]
+ps-datachunk = "0.1.0-35"
+
 [features]
 default = []
 rkyv = ["dep:rkyv"]
