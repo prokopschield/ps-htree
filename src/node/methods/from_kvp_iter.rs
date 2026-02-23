@@ -171,7 +171,7 @@ mod tests {
     fn from_kvp_iter_multiple_items() {
         let store = InMemoryStore::default();
 
-        let pairs: Vec<(UUID, u64)> = (0..10).map(|i| (UUID::gen_v4(), i as u64)).collect();
+        let pairs: Vec<(UUID, u64)> = (0_u64..10).map(|i| (UUID::gen_v4(), i)).collect();
         let items: Vec<_> = pairs.iter().map(|(k, v)| (k, v)).collect();
 
         let tree = HtreeNode::from_kvp_iter(items, &store).expect("from_kvp_iter should succeed");
@@ -196,7 +196,7 @@ mod tests {
     fn from_kvp_iter_large_input() {
         let store = InMemoryStore::default();
 
-        let pairs: Vec<(UUID, u64)> = (0..100).map(|i| (UUID::gen_v4(), i as u64)).collect();
+        let pairs: Vec<(UUID, u64)> = (0_u64..100).map(|i| (UUID::gen_v4(), i)).collect();
         let items: Vec<_> = pairs.iter().map(|(k, v)| (k, v)).collect();
 
         let tree = HtreeNode::from_kvp_iter(items, &store).expect("from_kvp_iter should succeed");
@@ -235,7 +235,7 @@ mod tests {
     fn from_kvp_iter_keys_are_sorted() {
         let store = InMemoryStore::default();
 
-        let pairs: Vec<(UUID, u64)> = (0..15).map(|i| (UUID::gen_v4(), i as u64)).collect();
+        let pairs: Vec<(UUID, u64)> = (0_u64..15).map(|i| (UUID::gen_v4(), i)).collect();
         let items: Vec<_> = pairs.iter().map(|(k, v)| (k, v)).collect();
 
         let tree = HtreeNode::from_kvp_iter(items, &store).expect("from_kvp_iter should succeed");

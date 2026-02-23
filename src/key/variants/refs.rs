@@ -40,7 +40,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use bytes::Bytes;
     use ps_hkey::{Hkey, InMemoryStore, Store};
@@ -51,6 +54,7 @@ mod tests {
     static TO_BYTES_CALLS: AtomicUsize = AtomicUsize::new(0);
     static TO_HKEY_CALLS: AtomicUsize = AtomicUsize::new(0);
     static TO_UUID_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static TEST_GUARD: Mutex<()> = Mutex::new(());
 
     #[derive(Clone, Copy, Debug)]
     struct ProbeKey;
@@ -80,6 +84,9 @@ mod tests {
 
     #[test]
     fn shared_reference_chain_does_not_recurse() -> Result<(), HtreeKeyError<InMemoryStore>> {
+        let _guard = TEST_GUARD
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         reset_counters();
         let store = InMemoryStore::default();
         let key = ProbeKey;
@@ -102,13 +109,16 @@ mod tests {
 
     #[test]
     fn mutable_reference_chain_does_not_recurse() -> Result<(), HtreeKeyError<InMemoryStore>> {
+        let _guard = TEST_GUARD
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         reset_counters();
         let store = InMemoryStore::default();
         let mut key = ProbeKey;
 
-        let mut r1 = &mut key;
-        let mut r2 = &mut r1;
-        let r3 = &mut r2;
+        let r1 = &mut key;
+        let r2 = &mut *r1;
+        let r3 = &mut *r2;
 
         assert_eq!(r3.try_to_bytes(&store)?, Bytes::from_static(b"probe-bytes"));
         assert_eq!(r3.try_to_hkey(&store)?, Hkey::from_raw(b"probe-hkey")?);

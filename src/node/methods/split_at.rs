@@ -125,7 +125,7 @@ mod tests {
         nodes
             .into_iter()
             .next()
-            .ok_or("expected at least one node".into())
+            .ok_or_else(|| "expected at least one node".into())
     }
 
     /// Generates `n` random sorted UUIDs.

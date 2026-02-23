@@ -405,7 +405,7 @@ mod tests {
         nodes
             .into_iter()
             .next()
-            .ok_or("expected at least one node".into())
+            .ok_or_else(|| "expected at least one node".into())
     }
 
     /// Generates `n` random sorted UUIDs.
@@ -511,7 +511,13 @@ mod tests {
         for &split_key in &keys {
             let (lt, gte) = tree.split_at(&split_key, &store)?;
 
-            let parts: Vec<HtreeNode<u64>> = [lt, gte].into_iter().flatten().collect();
+            let mut parts = Vec::new();
+            if let Some(node) = lt {
+                parts.push(node);
+            }
+            if let Some(node) = gte {
+                parts.push(node);
+            }
             let merged = HtreeNode::merge_many(parts, &store)?;
             let merged_keys = collect_keys_many(&merged, &store)?;
 
@@ -732,7 +738,7 @@ mod tests {
         let keys = gen_keys(50);
         let tree = make_tree(&keys, &store)?;
 
-        let merged = tree.clone().merge(tree.clone(), &store)?;
+        let merged = tree.clone().merge(tree, &store)?;
         let merged_keys = collect_keys(&merged, &store)?;
 
         assert_eq!(merged_keys, keys);
@@ -1328,7 +1334,13 @@ mod tests {
         // Split at various positions and verify merge restores
         for split_pos in [0, 1, 10, 25, 40, 49] {
             let (lt, gte) = tree.split_at(&keys[split_pos], &store)?;
-            let parts: Vec<HtreeNode<u64>> = [lt, gte].into_iter().flatten().collect();
+            let mut parts = Vec::new();
+            if let Some(node) = lt {
+                parts.push(node);
+            }
+            if let Some(node) = gte {
+                parts.push(node);
+            }
             let merged = HtreeNode::merge_many(parts, &store)?;
             let merged_keys = collect_keys_many(&merged, &store)?;
 
@@ -1365,7 +1377,7 @@ mod tests {
     // COMPLEXITY TESTS
     // =========================================================================
 
-    /// Helper to build tree on a CountingStore
+    /// Helper to build tree on a `CountingStore`
     fn make_tree_counting(
         keys: &[UUID],
         store: &CountingStore,
@@ -1387,10 +1399,10 @@ mod tests {
         nodes
             .into_iter()
             .next()
-            .ok_or("expected at least one node".into())
+            .ok_or_else(|| "expected at least one node".into())
     }
 
-    /// Collect keys from tree with CountingStore
+    /// Collect keys from tree with `CountingStore`
     fn collect_keys_counting(
         tree: &HtreeNode<u64>,
         store: &CountingStore,
@@ -1398,7 +1410,7 @@ mod tests {
         Ok(tree.iter_keys(store).collect::<Result<Vec<_>, _>>()?)
     }
 
-    /// Collect keys from multiple trees with CountingStore
+    /// Collect keys from multiple trees with `CountingStore`
     fn collect_keys_many_counting(
         trees: &[HtreeNode<u64>],
         store: &CountingStore,
@@ -1424,7 +1436,7 @@ mod tests {
         store.reset_counts();
 
         // Merge two trees at once
-        let merged = tree_a.clone().merge(tree_b.clone(), &store)?;
+        let merged = tree_a.merge(tree_b, &store)?;
         let ops_two_trees = store.total_ops();
 
         // Verify correctness
@@ -1513,7 +1525,7 @@ mod tests {
         store.reset_counts();
 
         // Method 2: merge leaves one by one
-        let mut merged_sequential = base.clone();
+        let mut merged_sequential = base;
         for leaf in new_leaves {
             merged_sequential = merged_sequential.merge(leaf, &store)?;
         }
@@ -1524,7 +1536,7 @@ mod tests {
         store.reset_counts();
         let sequential_keys = collect_keys_counting(&merged_sequential, &store)?;
 
-        let mut expected: Vec<UUID> = base_keys.clone();
+        let mut expected: Vec<UUID> = base_keys;
         expected.extend(&new_keys);
         expected.sort();
         expected.dedup(); // In case of any overlapping keys

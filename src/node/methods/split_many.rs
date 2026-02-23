@@ -251,7 +251,7 @@ mod tests {
         nodes
             .into_iter()
             .next()
-            .ok_or("expected at least one node".into())
+            .ok_or_else(|| "expected at least one node".into())
     }
 
     fn gen_keys(n: usize) -> Vec<UUID> {
@@ -316,7 +316,7 @@ mod tests {
         let parts = tree.split_many(&split_keys, &store)?;
 
         assert_eq!(parts.len(), 4);
-        assert!(parts.iter().all(|p| p.is_none()));
+        assert!(parts.iter().all(std::option::Option::is_none));
         Ok(())
     }
 
@@ -408,7 +408,7 @@ mod tests {
                 p.as_ref()
                     .map(|t| collect_keys(t, &store))
                     .transpose()
-                    .map(|opt| opt.unwrap_or_default())
+                    .map(std::option::Option::unwrap_or_default)
             })
             .collect::<Result<_, _>>()?;
 
@@ -418,7 +418,7 @@ mod tests {
                 p.as_ref()
                     .map(|t| collect_keys(t, &store))
                     .transpose()
-                    .map(|opt| opt.unwrap_or_default())
+                    .map(std::option::Option::unwrap_or_default)
             })
             .collect::<Result<_, _>>()?;
 
@@ -627,7 +627,9 @@ mod tests {
 
         // Each subsequent partition should have exactly one key
         for (i, part) in parts.iter().enumerate().skip(1) {
-            let tree = part.as_ref().ok_or(format!("expected partition {i}"))?;
+            let tree = part
+                .as_ref()
+                .ok_or_else(|| format!("expected partition {i}"))?;
             let part_keys = collect_keys(tree, &store)?;
             assert_eq!(part_keys.len(), 1);
             assert_eq!(part_keys[0], keys[i - 1]);
@@ -732,7 +734,7 @@ mod tests {
                 p.as_ref()
                     .map(|t| collect_keys(t, &store))
                     .transpose()
-                    .map(|opt| opt.unwrap_or_default())
+                    .map(std::option::Option::unwrap_or_default)
             })
             .collect::<Result<_, _>>()?;
 
@@ -742,7 +744,7 @@ mod tests {
                 p.as_ref()
                     .map(|t| collect_keys(t, &store))
                     .transpose()
-                    .map(|opt| opt.unwrap_or_default())
+                    .map(std::option::Option::unwrap_or_default)
             })
             .collect::<Result<_, _>>()?;
 
@@ -972,7 +974,6 @@ mod tests {
 
         // Create 10 subtrees, each with 10 leaves
         let mut children = Vec::new();
-        let mut child_hkeys = Vec::new();
 
         for batch in 0..10u8 {
             let batch_keys: Vec<UUID> = (0..10)
@@ -991,7 +992,6 @@ mod tests {
                 .collect::<Result<_, _>>()?;
 
             let child = HtreeNode::from_sorted_children(leaves, &store)?;
-            child_hkeys.push(child.hkey.clone());
             children.push(child);
         }
 
@@ -1189,11 +1189,10 @@ mod tests {
         }
 
         // Middle partitions (1-9) should be empty (between duplicate keys)
-        for i in 1..10 {
+        for (i, part) in parts.iter().take(10).enumerate().skip(1) {
             assert!(
-                parts[i].is_none(),
-                "Partition {} should be empty between duplicates",
-                i
+                part.is_none(),
+                "Partition {i} should be empty between duplicates"
             );
         }
 
@@ -1317,7 +1316,7 @@ mod tests {
         let parts = tree.split_many(&split_keys, &store)?;
 
         assert_eq!(parts.len(), 101);
-        assert!(parts.iter().all(|p| p.is_none()));
+        assert!(parts.iter().all(std::option::Option::is_none));
 
         Ok(())
     }
@@ -1388,7 +1387,7 @@ mod tests {
         for i in 1..=10 {
             let part = parts[i]
                 .as_ref()
-                .ok_or(format!("expected partition {}", i))?;
+                .ok_or_else(|| format!("expected partition {i}"))?;
             let part_keys = collect_keys(part, &store)?;
             assert_eq!(part_keys.len(), 1);
             assert_eq!(part_keys[0], keys[i - 1]);
@@ -1531,9 +1530,9 @@ mod tests {
 
             let num_splits = 1 + (UUID::gen_v4().as_bytes()[0] as usize % 20);
             let split_keys: Vec<UUID> = (0..num_splits)
-                .filter_map(|_| {
+                .map(|_| {
                     let idx = UUID::gen_v4().as_bytes()[0] as usize % num_keys;
-                    Some(keys[idx])
+                    keys[idx]
                 })
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()
@@ -1612,7 +1611,7 @@ mod tests {
             if let Some(tree) = part {
                 // Should be able to iterate without errors
                 let keys: Result<Vec<_>, _> = tree.iter_keys(&store).collect();
-                assert!(keys.is_ok(), "Partition {} should be iterable", i);
+                assert!(keys.is_ok(), "Partition {i} should be iterable");
 
                 // Height should make sense
                 if tree.is_leaf() {

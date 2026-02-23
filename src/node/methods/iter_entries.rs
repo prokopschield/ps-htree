@@ -121,8 +121,7 @@ mod tests {
         let store = InMemoryStore::default();
         let tree: HtreeNode<u64> = HtreeNode::default();
 
-        let entries: Vec<_> = tree.iter_entries(&store).collect();
-        assert!(entries.is_empty());
+        assert!(tree.iter_entries(&store).next().is_none());
     }
 
     #[test]

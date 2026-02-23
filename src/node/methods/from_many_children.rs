@@ -437,7 +437,7 @@ mod tests {
     fn max_children_plus_one_same_key() {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4();
-        let children: Vec<_> = (0..MAX_CHILDREN + 1)
+        let children: Vec<_> = (0..=MAX_CHILDREN)
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
@@ -650,12 +650,12 @@ mod tests {
         // A(1x), B(3x), C(1x), D(2x) = 7 total
         let mut children = Vec::new();
         children.push(make_leaf(&keys[0], 0, &store));
-        for i in 0..3 {
-            children.push(make_leaf(&keys[1], (10 + i) as u64, &store));
+        for i in 0_u64..3 {
+            children.push(make_leaf(&keys[1], 10 + i, &store));
         }
         children.push(make_leaf(&keys[2], 20, &store));
-        for i in 0..2 {
-            children.push(make_leaf(&keys[3], (30 + i) as u64, &store));
+        for i in 0_u64..2 {
+            children.push(make_leaf(&keys[3], 30 + i, &store));
         }
 
         assert!(children.len() <= MAX_CHILDREN);
@@ -857,12 +857,12 @@ mod tests {
             children.push(make_leaf(&keys[0], i as u64, &store));
         }
         // Now add 5 of keys[1] which would span the boundary
-        for i in 0..5 {
-            children.push(make_leaf(&keys[1], (i + 1000) as u64, &store));
+        for i in 0_u64..5 {
+            children.push(make_leaf(&keys[1], i + 1000, &store));
         }
         // Add some of keys[2]
-        for i in 0..3 {
-            children.push(make_leaf(&keys[2], (i + 2000) as u64, &store));
+        for i in 0_u64..3 {
+            children.push(make_leaf(&keys[2], i + 2000, &store));
         }
 
         let parents = HtreeNode::from_many_children(children, &store)
@@ -1247,7 +1247,7 @@ mod tests {
     fn single_key_max_children_plus_one() {
         let store = InMemoryStore::default();
         let key = UUID::gen_v4();
-        let children: Vec<_> = (0..MAX_CHILDREN + 1)
+        let children: Vec<_> = (0..=MAX_CHILDREN)
             .map(|i| make_leaf(&key, i as u64, &store))
             .collect();
 
@@ -1366,12 +1366,8 @@ mod tests {
             children.push(make_leaf(key, i as u64, &store));
         }
         // Then 3 of the last key (causes transition at boundary)
-        for i in 0..3 {
-            children.push(make_leaf(
-                &keys[MAX_CHILDREN - 1],
-                (1000 + i) as u64,
-                &store,
-            ));
+        for i in 0_u64..3 {
+            children.push(make_leaf(&keys[MAX_CHILDREN - 1], 1000 + i, &store));
         }
 
         let num_children = children.len();
@@ -1716,7 +1712,7 @@ mod tests {
         let keys = sorted_keys(2);
 
         let mut children = Vec::new();
-        for i in 0..MAX_CHILDREN + 1 {
+        for i in 0..=MAX_CHILDREN {
             children.push(make_leaf(&keys[0], i as u64, &store));
         }
         children.push(make_leaf(&keys[1], 1000, &store));
@@ -1794,13 +1790,12 @@ mod tests {
         let store = InMemoryStore::default();
         let keys = sorted_keys(MAX_CHILDREN);
 
-        let mut children = Vec::new();
-        // Three unique keys
-        children.push(make_leaf(&keys[0], 0, &store));
-        children.push(make_leaf(&keys[1], 1, &store));
-        children.push(make_leaf(&keys[2], 2, &store));
-        // Third key repeated (C should be held back)
-        children.push(make_leaf(&keys[2], 3, &store));
+        let mut children = vec![
+            make_leaf(&keys[0], 0, &store),
+            make_leaf(&keys[1], 1, &store),
+            make_leaf(&keys[2], 2, &store),
+            make_leaf(&keys[2], 3, &store),
+        ];
         // More children to exceed MAX_CHILDREN
         for (i, key) in keys.iter().enumerate().skip(3) {
             children.push(make_leaf(key, (100 + i) as u64, &store));
@@ -1824,13 +1819,12 @@ mod tests {
         let store = InMemoryStore::default();
         let keys = sorted_keys(MAX_CHILDREN);
 
-        let mut children = Vec::new();
-        // Three of the same key
-        children.push(make_leaf(&keys[0], 0, &store));
-        children.push(make_leaf(&keys[0], 1, &store));
-        children.push(make_leaf(&keys[0], 2, &store));
-        // Different key (no held_child needed)
-        children.push(make_leaf(&keys[1], 100, &store));
+        let mut children = vec![
+            make_leaf(&keys[0], 0, &store),
+            make_leaf(&keys[0], 1, &store),
+            make_leaf(&keys[0], 2, &store),
+            make_leaf(&keys[1], 100, &store),
+        ];
         // More children to exceed MAX_CHILDREN
         for (i, key) in keys.iter().enumerate().skip(2) {
             children.push(make_leaf(key, (200 + i) as u64, &store));
@@ -1945,7 +1939,7 @@ mod tests {
 
         for (i, parent) in parents.iter().enumerate() {
             let count = count_children(parent, &store);
-            assert!(count > 0, "Parent {} has no children", i);
+            assert!(count > 0, "Parent {i} has no children");
         }
     }
 
@@ -1974,7 +1968,7 @@ mod tests {
                 .expect("fetch_children should succeed")
             {
                 // Extract value by re-fetching
-                all_values.push(child.key.as_bytes()[0] as u64); // Using key as proxy
+                all_values.push(u64::from(child.key.as_bytes()[0])); // Using key as proxy
             }
         }
 
@@ -2472,11 +2466,11 @@ mod tests {
 
         // Create 5 subtrees, all with keys[0]
         let mut subtrees = Vec::new();
-        for i in 0..5 {
+        for i in 0_u64..5 {
             let subtree = make_internal_node(
                 vec![
-                    make_leaf(&keys[0], (i * 10) as u64, &store),
-                    make_leaf(&keys[0], (i * 10 + 1) as u64, &store),
+                    make_leaf(&keys[0], i * 10, &store),
+                    make_leaf(&keys[0], i * 10 + 1, &store),
                 ],
                 &store,
             );
@@ -2484,11 +2478,11 @@ mod tests {
         }
 
         // Add 2 subtrees with keys[1]
-        for i in 0..2 {
+        for i in 0_u64..2 {
             let subtree = make_internal_node(
                 vec![
-                    make_leaf(&keys[1], (100 + i * 10) as u64, &store),
-                    make_leaf(&keys[1], (100 + i * 10 + 1) as u64, &store),
+                    make_leaf(&keys[1], 100 + i * 10, &store),
+                    make_leaf(&keys[1], 100 + i * 10 + 1, &store),
                 ],
                 &store,
             );
