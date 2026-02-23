@@ -10,7 +10,7 @@ pub fn compact_to_uuid(bytes: &[u8]) -> UUID {
     let fold = &mut uuid.as_mut_bytes()[0x8..0x10];
 
     for (index, slice) in bytes.chunks(0x8).skip(2).enumerate() {
-        fold.rotate_left(index);
+        fold.rotate_left(index % fold.len());
 
         for (byte_index, &byte) in slice.iter().enumerate() {
             fold[byte_index] ^= byte;
