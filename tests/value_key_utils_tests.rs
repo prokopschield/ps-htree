@@ -1,17 +1,17 @@
 #![allow(clippy::expect_used)]
 
 use bytes::Bytes;
-use ps_datachunk::{DataChunk, OwnedDataChunk, PsDataChunkError};
-use ps_hkey::{Hash, InMemoryStore, MAX_SIZE_RAW, PsHkeyError, Store};
+use ps_datachunk::{DataChunk, DataChunkError, OwnedDataChunk};
+use ps_hkey::{Hash, HkeyError, InMemoryStore, MAX_SIZE_RAW, Store};
 use ps_htree::{HtreeKey, HtreeKeyError, HtreeValue, compact_to_uuid};
 use ps_uuid::{UUID, UUID_BYTES};
 
 #[derive(thiserror::Error, Debug)]
 enum NoPutStoreError {
     #[error(transparent)]
-    DataChunk(#[from] PsDataChunkError),
+    DataChunk(#[from] DataChunkError),
     #[error(transparent)]
-    Hkey(#[from] PsHkeyError),
+    Hkey(#[from] HkeyError),
     #[error("store.put was called")]
     PutCalled,
 }

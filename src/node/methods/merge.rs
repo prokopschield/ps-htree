@@ -286,9 +286,9 @@ impl<S: Store> From<crate::HtreeNodeSplitManyError<S>> for HtreeNodeMergeError<S
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use ps_datachunk::{DataChunk, OwnedDataChunk, PsDataChunkError};
+    use ps_datachunk::{DataChunk, DataChunkError, OwnedDataChunk};
     use ps_hash::Hash;
-    use ps_hkey::{InMemoryStore, InMemoryStoreError, PsHkeyError, Store};
+    use ps_hkey::{HkeyError, InMemoryStore, InMemoryStoreError, Store};
     use ps_uuid::UUID;
 
     use crate::HtreeNode;
@@ -335,14 +335,14 @@ mod tests {
         Inner(#[from] InMemoryStoreError),
     }
 
-    impl From<PsDataChunkError> for CountingStoreError {
-        fn from(err: PsDataChunkError) -> Self {
+    impl From<DataChunkError> for CountingStoreError {
+        fn from(err: DataChunkError) -> Self {
             Self::Inner(InMemoryStoreError::from(err))
         }
     }
 
-    impl From<PsHkeyError> for CountingStoreError {
-        fn from(err: PsHkeyError) -> Self {
+    impl From<HkeyError> for CountingStoreError {
+        fn from(err: HkeyError) -> Self {
             Self::Inner(InMemoryStoreError::from(err))
         }
     }

@@ -1,13 +1,13 @@
 use std::convert::Infallible;
 
 use bytes::Bytes;
-use ps_hkey::{Hkey, PsHkeyError, Store};
+use ps_hkey::{Hkey, HkeyError, Store};
 
 use crate::{HtreeValue, HtreeValuePackError, HtreeValueUnpackError};
 
 impl HtreeValue for Hkey {
     type PackError = Infallible;
-    type UnpackError = PsHkeyError;
+    type UnpackError = HkeyError;
 
     fn pack_owned<S>(&self, _store: &S) -> Result<Bytes, HtreeValuePackError<Self, S>>
     where
