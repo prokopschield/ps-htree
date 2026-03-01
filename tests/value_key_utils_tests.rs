@@ -1,5 +1,7 @@
 #![allow(clippy::expect_used)]
 
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use ps_datachunk::{DataChunk, DataChunkError, OwnedDataChunk};
 use ps_hkey::{Hash, HkeyError, InMemoryStore, MAX_SIZE_RAW, Store};
@@ -249,13 +251,13 @@ fn uuid_conversion_skips_store_put_for_raw_sized_payloads() {
         expected
     );
     assert_eq!(
-        short.try_to_uuid(&store).expect("expected success"),
+        Bytes::copy_from_slice(&short)
+            .try_to_uuid(&store)
+            .expect("expected success"),
         expected
     );
     assert_eq!(
-        Bytes::from(short)
-            .try_to_uuid(&store)
-            .expect("expected success"),
+        short.try_to_uuid(&store).expect("expected success"),
         expected
     );
 }
@@ -397,6 +399,137 @@ fn bytes_value_unpack_from_bytes_keeps_buffer() {
     let input = Bytes::from_static(b"buffer");
     let unpacked = Bytes::unpack_from_bytes(input.clone(), &store).expect("expected success");
     assert_eq!(unpacked, input);
+}
+
+#[test]
+fn cow_bytes_value_round_trip_for_borrowed_and_owned() {
+    let store = InMemoryStore::default();
+
+    let borrowed: Cow<'_, [u8]> = Cow::Borrowed(b"payload");
+    let borrowed_packed = borrowed.pack_owned(&store).expect("expected success");
+    let borrowed_unpacked =
+        Cow::<[u8]>::unpack(&borrowed_packed, &store).expect("expected success");
+    assert_eq!(borrowed_unpacked, Cow::<[u8]>::Owned(b"payload".to_vec()));
+
+    let owned: Cow<'_, [u8]> = Cow::Owned(vec![1, 2, 3, 4]);
+    let owned_packed = owned.pack_owned(&store).expect("expected success");
+    let owned_unpacked =
+        Cow::<[u8]>::unpack_from_bytes(owned_packed, &store).expect("expected success");
+    assert_eq!(owned_unpacked, Cow::<[u8]>::Owned(vec![1, 2, 3, 4]));
+}
+
+#[test]
+fn cow_str_value_round_trip_for_borrowed_and_owned() {
+    let store = InMemoryStore::default();
+
+    let borrowed: Cow<'_, str> = Cow::Borrowed("hello");
+    let borrowed_packed = borrowed.pack_owned(&store).expect("expected success");
+    let borrowed_unpacked = Cow::<str>::unpack(&borrowed_packed, &store).expect("expected success");
+    assert_eq!(borrowed_unpacked, Cow::<str>::Owned(String::from("hello")));
+
+    let owned: Cow<'_, str> = Cow::Owned(String::from("world"));
+    let owned_packed = owned.pack_owned(&store).expect("expected success");
+    let owned_unpacked =
+        Cow::<str>::unpack_from_bytes(owned_packed, &store).expect("expected success");
+    assert_eq!(owned_unpacked, Cow::<str>::Owned(String::from("world")));
+}
+
+#[test]
+fn vec_u8_value_pack_unpack_is_identity() {
+    let store = InMemoryStore::default();
+    let input = vec![1_u8, 2, 3, 4, 5];
+
+    let packed = input.pack_owned(&store).expect("expected success");
+    assert_eq!(packed.as_ref(), input.as_slice());
+
+    let unpacked = Vec::<u8>::unpack(&packed, &store).expect("expected success");
+    assert_eq!(unpacked, input);
+}
+
+#[test]
+fn byte_array_value_round_trip_and_length_check() {
+    let store = InMemoryStore::default();
+    let input = [9_u8, 8, 7, 6];
+
+    let packed = input.pack_owned(&store).expect("expected success");
+    let unpacked = <[u8; 4]>::unpack(&packed, &store).expect("expected success");
+
+    assert_eq!(unpacked, input);
+    assert!(<[u8; 4]>::unpack(b"abc", &store).is_err());
+}
+
+#[test]
+fn string_value_round_trip_and_utf8_validation() {
+    let store = InMemoryStore::default();
+    let input = String::from("hello-htree");
+
+    let packed = input.pack_owned(&store).expect("expected success");
+    let unpacked = String::unpack(&packed, &store).expect("expected success");
+
+    assert_eq!(unpacked, input);
+    assert!(String::unpack(&[0xFF], &store).is_err());
+}
+
+#[test]
+fn scalar_values_bool_char_and_floats_round_trip() {
+    let store = InMemoryStore::default();
+
+    let packed_false = false.pack_owned(&store).expect("expected success");
+    let packed_true = true.pack_owned(&store).expect("expected success");
+    assert!(packed_false.is_empty());
+    assert_eq!(packed_true.as_ref(), &[1]);
+    assert!(!bool::unpack(&packed_false, &store).expect("expected success"));
+    assert!(bool::unpack(&packed_true, &store).expect("expected success"));
+    assert!(bool::unpack(&[2], &store).is_err());
+
+    let ch = 'ß';
+    let packed_char = ch.pack_owned(&store).expect("expected success");
+    let unpacked_char = char::unpack(&packed_char, &store).expect("expected success");
+    assert_eq!(unpacked_char, ch);
+    assert!(char::unpack(&[0x11, 0x00, 0x00], &store).is_err());
+
+    let f32_val = f32::from_bits(0x7FC0_1234);
+    let f32_bits = f32::unpack(
+        &f32_val.pack_owned(&store).expect("expected success"),
+        &store,
+    )
+    .expect("expected success")
+    .to_bits();
+    assert_eq!(f32_bits, f32_val.to_bits());
+
+    let f64_val = f64::from_bits(0x7FF8_0000_0000_1234);
+    let f64_bits = f64::unpack(
+        &f64_val.pack_owned(&store).expect("expected success"),
+        &store,
+    )
+    .expect("expected success")
+    .to_bits();
+    assert_eq!(f64_bits, f64_val.to_bits());
+}
+
+#[test]
+fn wrapper_values_box_arc_and_rc_round_trip() {
+    use std::{rc::Rc, sync::Arc};
+
+    let store = InMemoryStore::default();
+
+    let boxed = Box::new(String::from("boxed-value"));
+    let boxed_unpacked =
+        Box::<String>::unpack(&boxed.pack_owned(&store).expect("expected success"), &store)
+            .expect("expected success");
+    assert_eq!(*boxed_unpacked, *boxed);
+
+    let arced = Arc::new(vec![1_u8, 2, 3]);
+    let arced_unpacked =
+        Arc::<Vec<u8>>::unpack(&arced.pack_owned(&store).expect("expected success"), &store)
+            .expect("expected success");
+    assert_eq!(*arced_unpacked, *arced);
+
+    let rced = Rc::new(42_u64);
+    let rced_unpacked =
+        Rc::<u64>::unpack(&rced.pack_owned(&store).expect("expected success"), &store)
+            .expect("expected success");
+    assert_eq!(*rced_unpacked, *rced);
 }
 
 #[test]

@@ -1,8 +1,12 @@
 mod bytes;
+mod cow;
 mod hash;
 mod hkey;
 mod integers;
 mod node;
+mod scalars;
+mod strings;
+mod wrappers;
 
 #[cfg(feature = "rkyv")]
 mod rkyv;
