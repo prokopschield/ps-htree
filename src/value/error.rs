@@ -8,9 +8,9 @@ where
     T: HtreeValue,
     S: Store,
 {
-    #[error("Pack error: $0")]
+    #[error("Pack error: {0}")]
     Pack(T::PackError),
-    #[error("Storage error: $0")]
+    #[error("Storage error: {0}")]
     Store(S::Error),
 }
 
@@ -20,8 +20,8 @@ where
     T: HtreeValue,
     S: Store,
 {
-    #[error("Unpack error: $0")]
+    #[error("Unpack error: {0}")]
     Unpack(T::UnpackError),
-    #[error("Fetch error: $0")]
+    #[error("Fetch error: {0}")]
     Store(S::Error),
 }
