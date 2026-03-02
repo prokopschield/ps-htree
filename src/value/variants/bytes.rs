@@ -139,15 +139,12 @@ mod tests {
         assert_eq!(unpacked, input);
 
         let err = <[u8; 4]>::unpack(b"abc", &store).expect_err("expected wrong-length error");
-        match err {
+        assert!(matches!(
+            err,
             HtreeValueUnpackError::Unpack(ByteArrayUnpackError::WrongLength {
-                expected,
-                actual,
-            }) => {
-                assert_eq!(expected, 4);
-                assert_eq!(actual, 3);
-            }
-            HtreeValueUnpackError::Store(_) => panic!("expected unpack error"),
-        }
+                expected: 4,
+                actual: 3,
+            })
+        ));
     }
 }
