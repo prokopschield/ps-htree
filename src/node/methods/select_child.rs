@@ -10,9 +10,9 @@ impl<T> HtreeNode<T> {
     /// - [`HtreeNodeSelectChildError::Key`] is passed from [`HtreeKey::try_to_uuid`]
     /// - [`HtreeNodeSelectChildError::Store`] is passed from store operations
     /// - [`HtreeNodeSelectChildError::UnpackChildren`] is passed from [`Self::resolve`]
-    pub fn select_child<S: Store>(
+    pub fn select_child<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<Option<Self>, HtreeNodeSelectChildError<S>> {
         // resolve key to UUID

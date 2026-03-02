@@ -22,7 +22,7 @@ impl<V> HtreeNode<V> {
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeUpsertManyError<V, S>>
     where
-        K: HtreeKey + 'k,
+        K: HtreeKey + ?Sized + 'k,
         V: HtreeValue + 'v,
         I: IntoIterator<Item = (&'k K, &'v V)>,
         S: Store,

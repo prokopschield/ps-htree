@@ -38,9 +38,9 @@ impl<T> HtreeNode<T> {
     /// let other_key = UUID::gen_v4();
     /// assert!(!tree.contains_key(&other_key, &store).unwrap());
     /// ```
-    pub fn contains_key<S: Store>(
+    pub fn contains_key<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<bool, HtreeNodeFindOneError<S>> {
         Ok(self.find_one(key, store)?.is_some())

@@ -45,7 +45,7 @@ impl<T> HtreeNode<T> {
         store: &S,
     ) -> Result<Self, HtreeNodeDeleteManyError<S>>
     where
-        K: HtreeKey + 'k,
+        K: HtreeKey + ?Sized + 'k,
         I: IntoIterator<Item = &'k K>,
         S: Store,
     {

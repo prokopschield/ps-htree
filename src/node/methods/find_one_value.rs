@@ -41,9 +41,9 @@ impl<T: HtreeValue> HtreeNode<T> {
     /// let other = UUID::gen_v4();
     /// assert_eq!(tree.find_one_value(&other, &store).unwrap(), None);
     /// ```
-    pub fn find_one_value<S: Store>(
+    pub fn find_one_value<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<Option<T>, HtreeNodeFindOneValueError<T, S>> {
         let Some(leaf) = self.find_one(key, store)? else {

@@ -21,8 +21,8 @@ impl<T: HtreeValue> HtreeNode<T> {
     /// # Errors
     ///
     /// Returns an error if key conversion, value packing, or storage fails.
-    pub fn from_kvp<S: Store>(
-        key: &impl HtreeKey,
+    pub fn from_kvp<K: HtreeKey + ?Sized, S: Store>(
+        key: &K,
         value: &T,
         store: &S,
     ) -> Result<Self, HtreeNodeFromKvpError<T, S>> {

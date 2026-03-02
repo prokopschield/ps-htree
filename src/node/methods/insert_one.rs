@@ -18,9 +18,9 @@ impl<T: HtreeValue> HtreeNode<T> {
     /// - [`Key`](HtreeNodeInsertOneError::Key) if key conversion fails.
     /// - [`Pack`](HtreeNodeInsertOneError::Pack) if value serialization fails.
     /// - [`InsertLeaves`](HtreeNodeInsertOneError::InsertLeaves) if insertion fails.
-    pub fn insert_one<S: Store>(
+    pub fn insert_one<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         value: &T,
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeInsertOneError<T, S>> {

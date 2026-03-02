@@ -20,12 +20,17 @@ impl<T> HtreeNode<T> {
     /// - [`HtreeNodeSelectChildRangeError::Key`] is returned if conversion of `from` or `to` to a UUID fails.
     /// - [`HtreeNodeSelectChildRangeError::Store`] is returned if store operations fail during key conversion or child node retrieval.
     /// - [`HtreeNodeSelectChildRangeError::UnpackChildren`] is returned if unpacking child nodes fails, indicating corrupted or invalid persisted state.
-    pub fn select_child_range<S: Store>(
+    pub fn select_child_range<KFrom, KTo, S>(
         &self,
-        from: &impl HtreeKey,
-        to: &impl HtreeKey,
+        from: &KFrom,
+        to: &KTo,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeSelectChildRangeError<S>> {
+    ) -> Result<Vec<Self>, HtreeNodeSelectChildRangeError<S>>
+    where
+        KFrom: HtreeKey + ?Sized,
+        KTo: HtreeKey + ?Sized,
+        S: Store,
+    {
         let from = from.try_to_uuid(store)?;
         let to = to.try_to_uuid(store)?;
 

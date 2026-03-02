@@ -19,9 +19,9 @@ impl<T: HtreeValue> HtreeNode<T> {
     /// - [`Key`](HtreeNodeUpdateOneError::Key) if key conversion fails.
     /// - [`Pack`](HtreeNodeUpdateOneError::Pack) if value serialization fails.
     /// - [`UpdateLeaves`](HtreeNodeUpdateOneError::UpdateLeaves) if update fails (e.g. key not found).
-    pub fn update_one<S: Store>(
+    pub fn update_one<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         value: &T,
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeUpdateOneError<T, S>> {

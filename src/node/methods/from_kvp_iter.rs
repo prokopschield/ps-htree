@@ -43,7 +43,7 @@ impl<V: HtreeValue> HtreeNode<V> {
         store: &S,
     ) -> Result<Self, HtreeNodeFromKvpIterError<V, S>>
     where
-        K: HtreeKey + 'k,
+        K: HtreeKey + ?Sized + 'k,
         V: 'v,
         I: IntoIterator<Item = (&'k K, &'v V)>,
         S: Store,

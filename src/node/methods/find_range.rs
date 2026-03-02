@@ -19,12 +19,17 @@ impl<T> HtreeNode<T> {
     /// - [`HtreeNodeFindRangeError::Key`] is returned if conversion of `from` or `to` to UUID fails.
     /// - [`HtreeNodeFindRangeError::Store`] is returned if store operations fail.
     /// - [`HtreeNodeFindRangeError::UnpackChildren`] is returned if unpacking children fails during traversal.
-    pub fn find_range<S: Store>(
+    pub fn find_range<KFrom, KTo, S>(
         &self,
-        from: &impl HtreeKey,
-        to: &impl HtreeKey,
+        from: &KFrom,
+        to: &KTo,
         store: &S,
-    ) -> Result<Vec<Self>, HtreeNodeFindRangeError<S>> {
+    ) -> Result<Vec<Self>, HtreeNodeFindRangeError<S>>
+    where
+        KFrom: HtreeKey + ?Sized,
+        KTo: HtreeKey + ?Sized,
+        S: Store,
+    {
         let from = from.try_to_uuid(store)?;
         let to = to.try_to_uuid(store)?;
 

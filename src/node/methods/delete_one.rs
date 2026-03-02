@@ -16,9 +16,9 @@ impl<T> HtreeNode<T> {
     /// - [`Store`](HtreeNodeDeleteOneError::Store) if persistence fails.
     /// - [`Key`](HtreeNodeDeleteOneError::Key) if key conversion fails.
     /// - [`DeleteMany`](HtreeNodeDeleteOneError::DeleteMany) if deletion fails.
-    pub fn delete_one<S: Store>(
+    pub fn delete_one<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<Self, HtreeNodeDeleteOneError<S>> {
         Ok(self.delete_many([key], store)?)

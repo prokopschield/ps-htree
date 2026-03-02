@@ -48,9 +48,9 @@ impl<T> HtreeNode<T> {
     /// assert!(lt.is_none());
     /// assert!(gte.is_some());
     /// ```
-    pub fn split_at<S: Store>(
+    pub fn split_at<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<(Option<Self>, Option<Self>), HtreeNodeSplitAtError<S>> {
         let key = key.try_to_uuid(store)?;

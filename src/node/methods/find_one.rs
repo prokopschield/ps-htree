@@ -21,9 +21,9 @@ impl<T> HtreeNode<T> {
     /// - [`HtreeNodeFindOneError::Key`] is returned if key conversion to a UUID fails.
     /// - [`HtreeNodeFindOneError::Store`] is returned if store operations fail during key conversion or child node retrieval.
     /// - [`HtreeNodeFindOneError::UnpackChildren`] is returned if unpacking child nodes fails during tree traversal, indicating corrupted or invalid persisted state.
-    pub fn find_one<S: Store>(
+    pub fn find_one<K: HtreeKey + ?Sized, S: Store>(
         &self,
-        key: &impl HtreeKey,
+        key: &K,
         store: &S,
     ) -> Result<Option<Self>, HtreeNodeFindOneError<S>> {
         let key = key.try_to_uuid(store)?;
