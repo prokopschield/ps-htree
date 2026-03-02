@@ -284,6 +284,7 @@ impl<S: Store> From<crate::HtreeNodeSplitManyError<S>> for HtreeNodeMergeError<S
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use ps_datachunk::{DataChunk, DataChunkError, OwnedDataChunk};

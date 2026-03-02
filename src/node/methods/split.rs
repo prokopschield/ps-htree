@@ -145,6 +145,7 @@ impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodeSplitErro
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
 

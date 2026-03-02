@@ -141,9 +141,9 @@ impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodePopLastEr
     }
 }
 
-#[allow(clippy::expect_used)]
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use ps_hkey::InMemoryStore;
     use ps_uuid::UUID;
 

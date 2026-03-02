@@ -40,6 +40,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use std::sync::{
         Mutex,
         atomic::{AtomicUsize, Ordering},

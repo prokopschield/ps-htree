@@ -159,6 +159,7 @@ fn map_unpack_error_u64_to_f64<S: Store>(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use ps_hkey::InMemoryStore;
 
     use super::*;

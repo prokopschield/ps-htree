@@ -33,6 +33,7 @@ impl HtreeValue for String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use ps_hkey::InMemoryStore;
 
     use super::*;
