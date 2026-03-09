@@ -57,11 +57,7 @@ impl<T> HtreeNode<T> {
         }
 
         // Find first child whose range may contain keys >= from_uuid.
-        // partition_point returns first index where condition is false, so we subtract 1
-        // to get the last child where key <= from_uuid, which contains the `from` boundary.
-        let first_index = children
-            .partition_point(|child| child.key <= from)
-            .saturating_sub(1);
+        let first_index = children.partition_point(|child| child.key < from);
 
         // Find last child whose range may contain keys <= to_uuid.
         // Same logic: last child where key <= to_uuid.
