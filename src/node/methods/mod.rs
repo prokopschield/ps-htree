@@ -52,6 +52,7 @@ pub use fetch_children_guard::HtreeChildrenGuard;
 pub use find_one::HtreeNodeFindOneError;
 pub use find_one_value::HtreeNodeFindOneValueError;
 pub use find_range::HtreeNodeFindRangeError;
+pub use first::HtreeNodeFirstError;
 pub use from_children::HtreeNodeFromChildrenError;
 pub use from_kvp::HtreeNodeFromKvpError;
 pub use from_kvp_iter::HtreeNodeFromKvpIterError;

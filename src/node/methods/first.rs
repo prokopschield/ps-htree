@@ -1,6 +1,6 @@
 use ps_hkey::Store;
 
-use crate::{HtreeNode, HtreeNodeFetchChildrenError};
+use crate::HtreeNode;
 
 impl<T> HtreeNode<T> {
     /// Returns the leaf with the smallest key in the tree.
@@ -15,7 +15,7 @@ impl<T> HtreeNode<T> {
     /// * `store` - persistence backend
     ///
     /// # Errors
-    /// Returns an error if children cannot be fetched during traversal.
+    /// Returns [`HtreeNodeFirstError`] if child iteration fails during traversal.
     ///
     /// # Examples
     ///
@@ -36,10 +36,7 @@ impl<T> HtreeNode<T> {
     /// let first = leaf.first(&store).unwrap().unwrap();
     /// assert_eq!(first.key, key);
     /// ```
-    pub fn first<S: Store>(
-        &self,
-        store: &S,
-    ) -> Result<Option<Self>, HtreeNodeFetchChildrenError<S>> {
+    pub fn first<S: Store>(&self, store: &S) -> Result<Option<Self>, HtreeNodeFirstError<S>> {
         if self.is_empty() {
             return Ok(None);
         }
@@ -47,16 +44,36 @@ impl<T> HtreeNode<T> {
         let mut current = self.clone();
 
         while !current.is_leaf() {
-            let children = current.fetch_children(store)?;
+            let first_child = current.iter_children(store)?.next();
 
             // Children are sorted; first child contains the minimum key
-            current = match children.into_iter().next() {
+            current = match first_child {
                 Some(child) => child,
                 None => return Ok(None),
             };
         }
 
         Ok(Some(current))
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum HtreeNodeFirstError<S: Store> {
+    #[error("HtreeNode's state is internally corrupted.")]
+    CorruptedState,
+    #[error("Store error: {0}")]
+    Store(S::Error),
+    #[error(transparent)]
+    UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
+}
+
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeFirstError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
+        match value {
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+        }
     }
 }
 
