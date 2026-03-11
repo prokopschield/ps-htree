@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use ps_hkey::Store;
 
 use crate::HtreeNode;
@@ -5,9 +7,10 @@ use crate::HtreeNode;
 impl<T> HtreeNode<T> {
     /// Iterates over all leaf nodes in this tree using depth-first traversal.
     ///
-    /// Yields leaves in left-to-right order. On error, the iterator enters
-    /// a retry state for the failed node: calling `next()` again will attempt
-    /// to refetch the failed node's children.
+    /// Yields leaves in left-to-right order. Implements [`DoubleEndedIterator`]
+    /// for reverse (right-to-left) traversal. On error, the iterator enters
+    /// a retry state for the failed node: calling `next()` or `next_back()`
+    /// again will attempt to refetch the failed node's children.
     ///
     /// # Arguments
     /// * `store` - Persistence backend
@@ -16,19 +19,19 @@ impl<T> HtreeNode<T> {
     /// See [`HtreeNodeIterLeavesError`] for all error variants.
     pub fn iter_leaves<'s, S: Store>(&self, store: &'s S) -> HtreeNodeIterLeaves<'s, T, S> {
         HtreeNodeIterLeaves {
-            queue: vec![self.clone()],
+            queue: VecDeque::from([self.clone()]),
             store,
         }
     }
 }
 
-/// Depth-first iterator over leaf nodes.
+/// Double-ended depth-first iterator over leaf nodes.
 ///
-/// Maintains a stack-based queue of internal nodes to visit. On each call
-/// to `next()`, pops a node; if internal, fetches children and reverses
-/// them to maintain left-to-right yield order.
+/// Maintains a deque of nodes to visit. `next()` processes from the front
+/// (left-to-right), `next_back()` processes from the back (right-to-left).
+/// The two directions maintain separate frontiers that meet in the middle.
 pub struct HtreeNodeIterLeaves<'s, T, S: Store> {
-    queue: Vec<HtreeNode<T>>,
+    queue: VecDeque<HtreeNode<T>>,
     store: &'s S,
 }
 
@@ -37,21 +40,59 @@ impl<S: Store, T> Iterator for HtreeNodeIterLeaves<'_, T, S> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let next = self.queue.pop()?;
+            let node = self.queue.pop_front()?;
 
-            if next.is_empty() {
+            if node.is_empty() {
                 continue;
             }
 
-            if next.is_leaf() {
-                return Some(Ok(next));
+            if node.is_leaf() {
+                return Some(Ok(node));
             }
 
-            match next.fetch_children(self.store) {
-                Ok(children) => self.queue.extend(children.into_iter().rev()),
+            // Descend: push children to front in reverse order (rightmost first)
+            // so leftmost ends up at front
+            match node.fetch_children(self.store) {
+                Ok(children) => {
+                    for child in children.into_iter().rev() {
+                        self.queue.push_front(child);
+                    }
+                }
                 Err(err) => {
                     // node not processed -> keep iterator state consistent
-                    self.queue.push(next);
+                    self.queue.push_front(node);
+
+                    return Some(Err(err.into()));
+                }
+            }
+        }
+    }
+}
+
+impl<S: Store, T> DoubleEndedIterator for HtreeNodeIterLeaves<'_, T, S> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        loop {
+            let node = self.queue.pop_back()?;
+
+            if node.is_empty() {
+                continue;
+            }
+
+            if node.is_leaf() {
+                return Some(Ok(node));
+            }
+
+            // Descend: push children to back in order (leftmost first)
+            // so rightmost ends up at back
+            match node.fetch_children(self.store) {
+                Ok(children) => {
+                    for child in children {
+                        self.queue.push_back(child);
+                    }
+                }
+                Err(err) => {
+                    // node not processed -> keep iterator state consistent
+                    self.queue.push_back(node);
 
                     return Some(Err(err.into()));
                 }
@@ -179,5 +220,93 @@ mod tests {
 
         original_keys.sort();
         assert_eq!(keys, original_keys);
+    }
+
+    #[test]
+    fn rev_yields_leaves_in_reverse_sorted_order() {
+        let store = InMemoryStore::default();
+
+        let mut original_keys: Vec<UUID> = (0..10).map(|_| UUID::gen_v4()).collect();
+
+        let leaves: Vec<_> = original_keys
+            .iter()
+            .enumerate()
+            .map(|(i, k)| {
+                HtreeNode::<u64>::from_kvp(k, &(i as u64), &store)
+                    .expect("from_kvp should create leaf node")
+            })
+            .collect();
+
+        let tree = HtreeNode::from_many_children(leaves, &store)
+            .expect("from_many_children should build tree from leaves")
+            .into_iter()
+            .next()
+            .expect("from_many_children should return at least one root node");
+
+        let keys: Vec<_> = tree
+            .iter_leaves(&store)
+            .rev()
+            .map(|r| r.expect("iter_leaves should not fail").key)
+            .collect();
+
+        let mut sorted_keys_desc = keys.clone();
+        sorted_keys_desc.sort();
+        sorted_keys_desc.reverse();
+        assert_eq!(keys, sorted_keys_desc);
+
+        original_keys.sort();
+        original_keys.reverse();
+        assert_eq!(keys, original_keys);
+    }
+
+    #[test]
+    fn interleaved_next_and_next_back() {
+        let store = InMemoryStore::default();
+
+        let mut original_keys: Vec<UUID> = (0..4).map(|_| UUID::gen_v4()).collect();
+        original_keys.sort();
+
+        let leaves: Vec<_> = original_keys
+            .iter()
+            .enumerate()
+            .map(|(i, k)| {
+                HtreeNode::<u64>::from_kvp(k, &(i as u64), &store)
+                    .expect("from_kvp should create leaf node")
+            })
+            .collect();
+
+        let tree = HtreeNode::from_many_children(leaves, &store)
+            .expect("from_many_children should build tree from leaves")
+            .into_iter()
+            .next()
+            .expect("from_many_children should return at least one root node");
+
+        let mut iter = tree.iter_leaves(&store);
+
+        // Get first from front
+        let first = iter.next().expect("should have first").expect("no error");
+        assert_eq!(first.key, original_keys[0]);
+
+        // Get last from back
+        let last = iter
+            .next_back()
+            .expect("should have last")
+            .expect("no error");
+        assert_eq!(last.key, original_keys[3]);
+
+        // Get second from front
+        let second = iter.next().expect("should have second").expect("no error");
+        assert_eq!(second.key, original_keys[1]);
+
+        // Get third from back
+        let third = iter
+            .next_back()
+            .expect("should have third")
+            .expect("no error");
+        assert_eq!(third.key, original_keys[2]);
+
+        // Should be exhausted
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
     }
 }
