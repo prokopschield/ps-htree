@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 bytes = "1.11.1"
+parking_lot = "0.12.5"
 postcard = { version = "1.1.3", features = ["alloc"], optional = true }
 ps-hash = "0.1.0-24"
 ps-hkey = "0.1.0-34"
