@@ -35,6 +35,17 @@ pub struct HtreeNodeIterChildren<'a, T> {
     back: usize,
 }
 
+impl<T> HtreeNodeIterChildren<'_, T> {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.back >= self.front
+    }
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.back.saturating_sub(self.front)
+    }
+}
+
 impl<'a, T> HtreeNodeIterChildren<'a, T> {
     fn new(guard: HtreeChildrenGuard<'a, T>) -> Self {
         let len = guard.len();
@@ -63,7 +74,7 @@ impl<T> Iterator for HtreeNodeIterChildren<'_, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.back - self.front;
+        let len = self.len();
 
         (len, Some(len))
     }
