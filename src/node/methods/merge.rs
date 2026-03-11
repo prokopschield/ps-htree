@@ -105,7 +105,7 @@ impl<T> HtreeNode<T> {
 
             if node.height() > child_height {
                 // Taller than children - unpack and categorize
-                for child in node.fetch_children(store)? {
+                for child in node.iter_children(store)? {
                     if child.is_empty() {
                         continue;
                     }
@@ -195,7 +195,7 @@ impl<T> HtreeNode<T> {
             let mut all_children: Vec<Self> = Vec::new();
 
             for node in nodes {
-                all_children.extend(node.fetch_children(store)?);
+                all_children.extend(node.iter_children(store)?);
             }
 
             return Self::merge_many(all_children, store);
@@ -258,6 +258,16 @@ impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeMergeErr
             crate::HtreeNodeFetchChildrenError::CorruptedState => Self::CorruptedState,
             crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
             crate::HtreeNodeFetchChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+        }
+    }
+}
+
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeMergeError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
+        match value {
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }
