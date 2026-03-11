@@ -128,6 +128,8 @@ impl<S: Store, T> DoubleEndedIterator for HtreeNodeIterSubtreesAtHeight<'_, T, S
     }
 }
 
+impl<S: Store, T> std::iter::FusedIterator for HtreeNodeIterSubtreesAtHeight<'_, T, S> {}
+
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeIterSubtreesAtHeightError<S: Store> {
     #[error("HtreeNode's state is internally corrupted.")]

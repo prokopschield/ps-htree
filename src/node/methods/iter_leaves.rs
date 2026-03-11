@@ -60,6 +60,8 @@ impl<S: Store, T> Iterator for HtreeNodeIterLeaves<'_, T, S> {
     }
 }
 
+impl<S: Store, T> std::iter::FusedIterator for HtreeNodeIterLeaves<'_, T, S> {}
+
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodeIterLeavesError<S: Store> {
     #[error("HtreeNode's state is internally corrupted.")]
