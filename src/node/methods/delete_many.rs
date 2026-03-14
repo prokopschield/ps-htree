@@ -104,23 +104,25 @@ impl<T> HtreeNode<T> {
         keys_to_delete: &[UUID],
         store: &S,
     ) -> Result<Vec<Self>, HtreeNodeDeleteManyError<S>> {
+        let children = self.fetch_children_guard(store)?;
+
         // Base case: This node is the parent of leaf nodes
         if self.height <= LEAF_HEIGHT + 1 {
-            let current_leaves = self.fetch_children(store)?;
-
             // Filter out matching leaves
-            let filtered: Vec<Self> = current_leaves
-                .into_iter()
+            let filtered: Vec<Self> = children
+                .iter()
                 .filter(|leaf| {
                     // binary_search provides O(log K) complexity
                     keys_to_delete.binary_search(&leaf.key).is_err()
                 })
+                .cloned()
                 .collect();
+
+            drop(children);
 
             return Ok(Self::from_many_children(filtered, store)?);
         }
 
-        let children = self.fetch_children(store)?;
         let mut rebuilt_children = Vec::with_capacity(children.len());
 
         // Skip keys smaller than the first child's key, which can't exist in this subtree.
@@ -129,9 +131,8 @@ impl<T> HtreeNode<T> {
             |first| &keys_to_delete[keys_to_delete.partition_point(|&k| k < first.key)..],
         );
 
-        let mut iter = children.into_iter().peekable();
-        while let Some(child) = iter.next() {
-            let next_key = iter.peek().map(|next| next.key);
+        for (idx, child) in children.iter().enumerate() {
+            let next_key = children.get(idx + 1).map(|next| next.key);
 
             // Consecutive siblings with the same key only occur when
             // `from_many_children` split a duplicate run across child nodes.
@@ -139,7 +140,7 @@ impl<T> HtreeNode<T> {
             // keep or drop it without recursing.
             if next_key == Some(child.key) {
                 if remaining_keys.binary_search(&child.key).is_err() {
-                    rebuilt_children.push(child);
+                    rebuilt_children.push(child.clone());
                 }
 
                 continue;
@@ -155,11 +156,13 @@ impl<T> HtreeNode<T> {
             remaining_keys = rest;
 
             if keys_for_child.is_empty() {
-                rebuilt_children.push(child);
+                rebuilt_children.push(child.clone());
             } else {
                 rebuilt_children.extend(child.delete_leaves_recursive(keys_for_child, store)?);
             }
         }
+
+        drop(children);
 
         Ok(Self::from_many_children(rebuilt_children, store)?)
     }
