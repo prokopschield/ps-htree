@@ -123,35 +123,42 @@ impl<T> HtreeNode<T> {
         let children = self.fetch_children(store)?;
         let mut rebuilt_children = Vec::with_capacity(children.len());
 
-        // Efficiently slice keys_to_delete using the sliding pivot approach.
-        // We ignore keys smaller than the first child's key immediately.
+        // Skip keys smaller than the first child's key, which can't exist in this subtree.
         let mut remaining_keys = children.first().map_or_else(
             || &[][..],
             |first| &keys_to_delete[keys_to_delete.partition_point(|&k| k < first.key)..],
         );
 
         let mut iter = children.into_iter().peekable();
-        while let Some(node) = iter.next() {
-            // Find the boundary: keys belonging to the current node are those
-            // strictly less than the next sibling's key.
-            let (to_process, rest) = iter.peek().map_or_else(
-                // Last child consumes the remainder of relevant keys
-                || (remaining_keys, &[][..]),
-                |next_sibling| {
-                    let mid = remaining_keys.partition_point(|&k| k < next_sibling.key);
-                    remaining_keys.split_at(mid)
-                },
-            );
+        while let Some(child) = iter.next() {
+            let next_key = iter.peek().map(|next| next.key);
 
-            if to_process.is_empty() {
-                rebuilt_children.push(node);
-            } else {
-                let resulting_nodes = node.delete_leaves_recursive(to_process, store)?;
+            // Consecutive siblings with the same key only occur when
+            // `from_many_children` split a duplicate run across child nodes.
+            // That means this subtree contains only `child.key`, so we can
+            // keep or drop it without recursing.
+            if next_key == Some(child.key) {
+                if remaining_keys.binary_search(&child.key).is_err() {
+                    rebuilt_children.push(child);
+                }
 
-                rebuilt_children.extend(resulting_nodes);
+                continue;
             }
 
+            // Partition: keys in [child.key, next_key) belong to this child.
+            let split = next_key.map_or(remaining_keys.len(), |upper| {
+                remaining_keys.partition_point(|&k| k < upper)
+            });
+
+            let (keys_for_child, rest) = remaining_keys.split_at(split);
+
             remaining_keys = rest;
+
+            if keys_for_child.is_empty() {
+                rebuilt_children.push(child);
+            } else {
+                rebuilt_children.extend(child.delete_leaves_recursive(keys_for_child, store)?);
+            }
         }
 
         Ok(Self::from_many_children(rebuilt_children, store)?)
@@ -204,6 +211,358 @@ impl<S: Store> From<crate::HtreeNodeFromChildrenError<S>> for HtreeNodeDeleteMan
         match value {
             crate::HtreeNodeFromChildrenError::Store(err) => Self::Store(err),
             err => Self::FromChildren(err),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used)]
+    use std::collections::HashSet;
+
+    use ps_hkey::InMemoryStore;
+    use ps_uuid::UUID;
+
+    use crate::{HtreeNode, MAX_CHILDREN};
+
+    fn collapse_to_root(mut roots: Vec<HtreeNode<u64>>, store: &InMemoryStore) -> HtreeNode<u64> {
+        if roots.is_empty() {
+            return HtreeNode::default();
+        }
+
+        while roots.len() > 1 {
+            roots = HtreeNode::from_many_children(roots, store)
+                .expect("from_many_children should succeed");
+        }
+
+        roots
+            .into_iter()
+            .next()
+            .expect("non-empty roots should contain one node")
+    }
+
+    fn tree_from_keys(keys: &[UUID], store: &InMemoryStore) -> HtreeNode<u64> {
+        if keys.is_empty() {
+            return HtreeNode::default();
+        }
+
+        let leaves: Vec<_> = keys
+            .iter()
+            .enumerate()
+            .map(|(idx, key)| {
+                HtreeNode::from_kvp(key, &(idx as u64), store).expect("from_kvp should create leaf")
+            })
+            .collect();
+
+        let roots = HtreeNode::from_many_children(leaves, store)
+            .expect("from_many_children should succeed");
+        collapse_to_root(roots, store)
+    }
+
+    fn collect_sorted_keys(tree: &HtreeNode<u64>, store: &InMemoryStore) -> Vec<UUID> {
+        let mut keys: Vec<_> = tree
+            .iter_keys(store)
+            .map(|item| item.expect("iter_keys should succeed"))
+            .collect();
+        keys.sort_unstable();
+        keys
+    }
+
+    fn key_occurrence_count(tree: &HtreeNode<u64>, key: UUID, store: &InMemoryStore) -> usize {
+        tree.iter_keys(store)
+            .map(|item| item.expect("iter_keys should succeed"))
+            .filter(|candidate| *candidate == key)
+            .count()
+    }
+
+    fn unique_sorted(mut keys: Vec<UUID>) -> Vec<UUID> {
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
+
+    fn missing_keys(existing: &[UUID], count: usize) -> Vec<UUID> {
+        let existing_set: HashSet<_> = existing.iter().copied().collect();
+        let mut missing = Vec::with_capacity(count);
+        while missing.len() < count {
+            let candidate = UUID::gen_v4();
+            if existing_set.contains(&candidate) || missing.contains(&candidate) {
+                continue;
+            }
+            missing.push(candidate);
+        }
+        missing
+    }
+
+    fn patterned_keys(total: usize, distinct: usize) -> Vec<UUID> {
+        if total == 0 {
+            return Vec::new();
+        }
+
+        let distinct = distinct.clamp(1, total);
+        let mut unique_keys: Vec<_> = (0..distinct).map(|_| UUID::gen_v4()).collect();
+        unique_keys.sort_unstable();
+
+        let mut keys = Vec::with_capacity(total);
+        for idx in 0..total {
+            keys.push(unique_keys[idx % unique_keys.len()]);
+        }
+        keys.sort_unstable();
+        keys
+    }
+
+    fn delete_many_reference(
+        tree: HtreeNode<u64>,
+        delete_keys: &[UUID],
+        store: &InMemoryStore,
+    ) -> HtreeNode<u64> {
+        let normalized_keys = unique_sorted(delete_keys.to_vec());
+        tree.retain(|key, _| normalized_keys.binary_search(&key).is_err(), store)
+            .expect("retain should succeed")
+    }
+
+    fn assert_matches_reference(
+        tree: &HtreeNode<u64>,
+        delete_keys: &[UUID],
+        store: &InMemoryStore,
+    ) {
+        let actual = tree
+            .delete_many(delete_keys.iter(), store)
+            .expect("delete_many should succeed");
+        let expected = delete_many_reference(tree.clone(), delete_keys, store);
+
+        assert_eq!(
+            collect_sorted_keys(&actual, store),
+            collect_sorted_keys(&expected, store)
+        );
+    }
+
+    #[test]
+    fn delete_many_leaf_with_matching_key_returns_default() {
+        let store = InMemoryStore::default();
+        let key = UUID::gen_v4();
+
+        let leaf = HtreeNode::from_kvp(&key, &7_u64, &store).expect("from_kvp should succeed");
+        let deleted = leaf
+            .delete_many([&key], &store)
+            .expect("delete_many should succeed");
+
+        assert!(deleted.is_empty());
+    }
+
+    #[test]
+    fn delete_many_leaf_with_missing_key_is_noop() {
+        let store = InMemoryStore::default();
+        let key = UUID::gen_v4();
+        let missing = UUID::gen_v4();
+
+        let leaf = HtreeNode::from_kvp(&key, &11_u64, &store).expect("from_kvp should succeed");
+        let deleted = leaf
+            .delete_many([&missing], &store)
+            .expect("delete_many should succeed");
+
+        assert_eq!(collect_sorted_keys(&deleted, &store), vec![key]);
+    }
+
+    #[test]
+    fn delete_many_empty_tree_is_noop() {
+        let store = InMemoryStore::default();
+        let empty: HtreeNode<u64> = HtreeNode::default();
+        let delete_keys: Vec<_> = (0..8).map(|_| UUID::gen_v4()).collect();
+
+        let deleted = empty
+            .delete_many(delete_keys.iter(), &store)
+            .expect("delete_many should succeed");
+
+        assert!(deleted.is_empty());
+    }
+
+    #[test]
+    fn delete_many_unsorted_duplicate_inputs_match_reference() {
+        let store = InMemoryStore::default();
+        let keys = patterned_keys(40, 24);
+        let tree = tree_from_keys(&keys, &store);
+        let unique = unique_sorted(keys);
+
+        let delete_keys = vec![unique[7], unique[1], unique[7], unique[3], unique[1]];
+        assert_matches_reference(&tree, &delete_keys, &store);
+    }
+
+    #[test]
+    fn delete_many_removes_all_duplicates_across_sibling_subtrees() {
+        let store = InMemoryStore::default();
+        let duplicate_key = UUID::gen_v4();
+
+        let leaves: Vec<_> = (0..=MAX_CHILDREN)
+            .map(|idx| {
+                HtreeNode::from_kvp(&duplicate_key, &(idx as u64), &store)
+                    .expect("expected success")
+            })
+            .collect();
+
+        let mut roots = HtreeNode::from_many_children(leaves, &store).expect("expected success");
+        while roots.len() > 1 {
+            roots = HtreeNode::from_many_children(roots, &store).expect("expected success");
+        }
+
+        let root = roots.into_iter().next().unwrap_or_default();
+        let before_count = root.iter_keys(&store).count();
+        assert_eq!(before_count, MAX_CHILDREN + 1);
+
+        let deleted = root
+            .delete_many([&duplicate_key], &store)
+            .expect("expected success");
+
+        assert!(
+            !deleted
+                .contains_key(&duplicate_key, &store)
+                .expect("expected success")
+        );
+        assert_eq!(deleted.iter_keys(&store).count(), 0);
+    }
+
+    #[test]
+    fn delete_many_removes_multiple_duplicate_runs_spanning_siblings() {
+        let store = InMemoryStore::default();
+
+        let mut ordered_keys = [UUID::gen_v4(), UUID::gen_v4(), UUID::gen_v4()];
+        ordered_keys.sort_unstable();
+        let key_a = ordered_keys[0];
+        let key_b = ordered_keys[1];
+        let key_c = ordered_keys[2];
+
+        let mut keys = Vec::new();
+        keys.extend(std::iter::repeat_n(key_a, MAX_CHILDREN + 1));
+        keys.extend(std::iter::repeat_n(key_b, MAX_CHILDREN + 2));
+        keys.extend(std::iter::repeat_n(key_c, 3));
+
+        let tree = tree_from_keys(&keys, &store);
+        let deleted = tree
+            .delete_many([&key_a, &key_b], &store)
+            .expect("delete_many should succeed");
+
+        assert_eq!(key_occurrence_count(&deleted, key_a, &store), 0);
+        assert_eq!(key_occurrence_count(&deleted, key_b, &store), 0);
+        assert_eq!(key_occurrence_count(&deleted, key_c, &store), 3);
+    }
+
+    #[test]
+    fn delete_many_is_idempotent_for_mixed_existing_and_missing_keys() {
+        let store = InMemoryStore::default();
+        let keys = patterned_keys(MAX_CHILDREN + 19, 17);
+        let tree = tree_from_keys(&keys, &store);
+        let unique = unique_sorted(keys);
+        let missing = missing_keys(&unique, 6);
+
+        let delete_keys = vec![
+            unique[0],
+            missing[0],
+            unique[0],
+            unique[unique.len() / 2],
+            missing[3],
+            unique[unique.len() - 1],
+            missing[0],
+        ];
+
+        let once = tree
+            .delete_many(delete_keys.iter(), &store)
+            .expect("delete_many should succeed");
+        let twice = once
+            .delete_many(delete_keys.iter(), &store)
+            .expect("delete_many should succeed");
+
+        assert_eq!(
+            collect_sorted_keys(&once, &store),
+            collect_sorted_keys(&twice, &store)
+        );
+        assert_matches_reference(&tree, &delete_keys, &store);
+    }
+
+    #[test]
+    fn delete_many_matches_retain_reference_for_varied_tree_sizes() {
+        let store = InMemoryStore::default();
+        let varied_sizes = [
+            0,
+            1,
+            2,
+            3,
+            7,
+            16,
+            MAX_CHILDREN.saturating_sub(1),
+            MAX_CHILDREN,
+            MAX_CHILDREN + 1,
+            MAX_CHILDREN + 17,
+        ];
+
+        for size in varied_sizes {
+            let distinct = if size == 0 { 0 } else { (size / 3).max(1) };
+            let keys = patterned_keys(size, distinct);
+            let tree = tree_from_keys(&keys, &store);
+            let unique = unique_sorted(keys);
+            let missing = missing_keys(&unique, 4);
+
+            let mut delete_cases = vec![Vec::new(), missing.clone()];
+            if let Some(first) = unique.first() {
+                delete_cases.push(vec![*first]);
+            }
+            if let Some(last) = unique.last() {
+                delete_cases.push(vec![*last, *last]);
+            }
+            if unique.len() >= 3 {
+                delete_cases.push(vec![unique[2], unique[0], unique[2], unique[1]]);
+            }
+            if !unique.is_empty() {
+                delete_cases.push(unique.clone());
+            }
+
+            let mut mixed = missing;
+            if let Some(first) = unique.first() {
+                mixed.push(*first);
+                mixed.push(*first);
+            }
+            if let Some(last) = unique.last() {
+                mixed.push(*last);
+            }
+            mixed.reverse();
+            delete_cases.push(mixed);
+
+            for delete_keys in delete_cases {
+                assert_matches_reference(&tree, &delete_keys, &store);
+            }
+        }
+    }
+
+    #[test]
+    fn delete_many_matches_retain_reference_for_mixed_duplicate_patterns() {
+        let store = InMemoryStore::default();
+
+        for case_idx in 0_usize..32 {
+            let total = 5 + case_idx;
+            let distinct = (case_idx % 9) + 1;
+            let mut keys = patterned_keys(total, distinct.min(total));
+            if !keys.is_empty() {
+                let key_count = keys.len();
+                keys.rotate_left(case_idx % key_count);
+            }
+
+            let tree = tree_from_keys(&keys, &store);
+            let unique = unique_sorted(keys);
+            let missing = missing_keys(&unique, 8);
+
+            let mut delete_keys = Vec::new();
+            for idx in 0_usize..12 {
+                if idx % 3 == 0 && !unique.is_empty() {
+                    delete_keys.push(unique[(idx + case_idx) % unique.len()]);
+                } else {
+                    delete_keys.push(missing[(idx + case_idx) % missing.len()]);
+                }
+
+                if idx % 4 == 0 {
+                    delete_keys.push(*delete_keys.last().expect("delete_keys should not be empty"));
+                }
+            }
+
+            assert_matches_reference(&tree, &delete_keys, &store);
         }
     }
 }
