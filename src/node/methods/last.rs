@@ -1,6 +1,6 @@
 use ps_hkey::Store;
 
-use crate::{HtreeNode, HtreeNodeFetchChildrenError};
+use crate::HtreeNode;
 
 impl<T> HtreeNode<T> {
     /// Returns the leaf with the largest key in the tree.
@@ -35,27 +35,31 @@ impl<T> HtreeNode<T> {
     /// let last = leaf.last(&store).unwrap().unwrap();
     /// assert_eq!(last.key, key);
     /// ```
-    pub fn last<S: Store>(
-        &self,
-        store: &S,
-    ) -> Result<Option<Self>, HtreeNodeFetchChildrenError<S>> {
-        if self.is_empty() {
-            return Ok(None);
+    pub fn last<S: Store>(&self, store: &S) -> Result<Option<Self>, HtreeNodeLastError<S>> {
+        self.iter_leaves(store)
+            .next_back()
+            .transpose()
+            .map_err(Into::into)
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum HtreeNodeLastError<S: Store> {
+    #[error("HtreeNode's state is internally corrupted.")]
+    CorruptedState,
+    #[error("Store error: {0}")]
+    Store(S::Error),
+    #[error(transparent)]
+    UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
+}
+
+impl<S: Store> From<crate::HtreeNodeIterLeavesError<S>> for HtreeNodeLastError<S> {
+    fn from(value: crate::HtreeNodeIterLeavesError<S>) -> Self {
+        match value {
+            crate::HtreeNodeIterLeavesError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterLeavesError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterLeavesError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
-
-        let mut current = self.clone();
-
-        while !current.is_leaf() {
-            let children = current.fetch_children(store)?;
-
-            // Children are sorted; last child contains the maximum key
-            current = match children.into_iter().next_back() {
-                Some(child) => child,
-                None => return Ok(None),
-            };
-        }
-
-        Ok(Some(current))
     }
 }
 

@@ -65,6 +65,7 @@ pub use iter_entries::HtreeNodeIterEntriesError;
 pub use iter_leaves::HtreeNodeIterLeavesError;
 pub use iter_subtrees_at_height::HtreeNodeIterSubtreesAtHeightError;
 pub use iter_values::HtreeNodeIterValuesError;
+pub use last::HtreeNodeLastError;
 pub use merge::HtreeNodeMergeError;
 pub use merge_disjoint_subtrees::HtreeNodeMergeDisjointSubtreesError;
 pub use pop_first::HtreeNodePopFirstError;
