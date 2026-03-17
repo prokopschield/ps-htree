@@ -77,6 +77,8 @@ impl<S: Store, T> Iterator for HtreeNodeIterSubtreesAtHeight<'_, T, S> {
 
             // Descend: push children to front in reverse order (rightmost first)
             // so leftmost ends up at front
+            let mut fetch_err = None;
+
             match node.fetch_children(self.store) {
                 Ok(children) => {
                     for child in children.into_iter().rev() {
@@ -84,9 +86,15 @@ impl<S: Store, T> Iterator for HtreeNodeIterSubtreesAtHeight<'_, T, S> {
                     }
                 }
                 Err(err) => {
-                    self.queue.push_front(node);
-                    return Some(Err(err.into()));
+                    fetch_err = Some(err);
                 }
+            }
+
+            if let Some(err) = fetch_err {
+                // node not processed, return it into the queue
+                self.queue.push_front(node);
+
+                return Some(Err(err.into()));
             }
         }
     }
@@ -113,6 +121,8 @@ impl<S: Store, T> DoubleEndedIterator for HtreeNodeIterSubtreesAtHeight<'_, T, S
 
             // Descend: push children to back in order (leftmost first)
             // so rightmost ends up at back
+            let mut fetch_err = None;
+
             match node.fetch_children(self.store) {
                 Ok(children) => {
                     for child in children {
@@ -120,9 +130,15 @@ impl<S: Store, T> DoubleEndedIterator for HtreeNodeIterSubtreesAtHeight<'_, T, S
                     }
                 }
                 Err(err) => {
-                    self.queue.push_back(node);
-                    return Some(Err(err.into()));
+                    fetch_err = Some(err);
                 }
+            }
+
+            if let Some(err) = fetch_err {
+                // node not processed, return it into the queue
+                self.queue.push_back(node);
+
+                return Some(Err(err.into()));
             }
         }
     }
