@@ -37,23 +37,10 @@ impl<T> HtreeNode<T> {
     /// assert_eq!(first.key, key);
     /// ```
     pub fn first<S: Store>(&self, store: &S) -> Result<Option<Self>, HtreeNodeFirstError<S>> {
-        if self.is_empty() {
-            return Ok(None);
-        }
-
-        let mut current = self.clone();
-
-        while !current.is_leaf() {
-            let first_child = current.iter_children(store)?.next();
-
-            // Children are sorted; first child contains the minimum key
-            current = match first_child {
-                Some(child) => child,
-                None => return Ok(None),
-            };
-        }
-
-        Ok(Some(current))
+        self.iter_leaves(store)
+            .next()
+            .transpose()
+            .map_err(Into::into)
     }
 }
 
@@ -67,12 +54,12 @@ pub enum HtreeNodeFirstError<S: Store> {
     UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
 }
 
-impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeFirstError<S> {
-    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
+impl<S: Store> From<crate::HtreeNodeIterLeavesError<S>> for HtreeNodeFirstError<S> {
+    fn from(value: crate::HtreeNodeIterLeavesError<S>) -> Self {
         match value {
-            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedState,
-            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
-            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+            crate::HtreeNodeIterLeavesError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterLeavesError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterLeavesError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }
