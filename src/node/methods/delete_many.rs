@@ -315,7 +315,7 @@ mod tests {
     }
 
     fn delete_many_reference(
-        tree: HtreeNode<u64>,
+        tree: &HtreeNode<u64>,
         delete_keys: &[UUID],
         store: &InMemoryStore,
     ) -> HtreeNode<u64> {
@@ -332,7 +332,7 @@ mod tests {
         let actual = tree
             .delete_many(delete_keys.iter(), store)
             .expect("delete_many should succeed");
-        let expected = delete_many_reference(tree.clone(), delete_keys, store);
+        let expected = delete_many_reference(tree, delete_keys, store);
 
         assert_eq!(
             collect_sorted_keys(&actual, store),
