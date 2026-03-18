@@ -41,7 +41,7 @@ impl<T: HtreeValue> HtreeNode<T> {
     /// assert_eq!(count, 5);
     /// ```
     pub fn retain<S, F>(
-        self,
+        &self,
         mut predicate: F,
         store: &S,
     ) -> Result<Self, HtreeNodeRetainError<T, S>>
@@ -55,7 +55,7 @@ impl<T: HtreeValue> HtreeNode<T> {
     }
 
     fn retain_inner<S, F>(
-        self,
+        &self,
         predicate: &mut F,
         store: &S,
     ) -> Result<Option<Self>, HtreeNodeRetainError<T, S>>
@@ -76,25 +76,28 @@ impl<T: HtreeValue> HtreeNode<T> {
             let value = T::unpack_from_bytes(bytes, store)?;
 
             return if predicate(self.key, value) {
-                Ok(Some(self))
+                Ok(Some(self.clone()))
             } else {
                 Ok(None)
             };
         }
 
-        let children = self
-            .fetch_children(store)?
-            .into_iter()
-            .filter_map(|child| match child.retain_inner(predicate, store) {
-                Ok(Some(child)) => Some(Ok(child)),
-                Ok(None) => None,
-                Err(err) => Some(Err(err)),
-            })
+        let original_children = self.fetch_children_guard(store)?;
+
+        let children = original_children
+            .iter()
+            .filter_map(|child| child.retain_inner(predicate, store).transpose())
             .collect::<Result<Vec<Self>, _>>()?;
 
         if children.is_empty() {
             return Ok(None);
         }
+
+        if *children == *original_children {
+            return Ok(Some(self.clone()));
+        }
+
+        drop(original_children);
 
         Ok(Some(Self::from_children(children, store)?))
     }
@@ -685,7 +688,6 @@ mod tests {
         let keys_to_drop_set: std::collections::HashSet<_> = keys_to_drop.iter().copied().collect();
 
         let retained = tree
-            .clone()
             .retain(|key, _| !keys_to_drop_set.contains(&key), &store)
             .expect("retain should succeed");
 
