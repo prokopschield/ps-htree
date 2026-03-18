@@ -84,7 +84,7 @@ impl<T> HtreeNode<T> {
             return Ok(result);
         }
 
-        let children = self.fetch_children(store)?;
+        let children = self.fetch_children_guard(store)?;
         let mut partitions: Vec<Vec<Self>> = vec![Vec::new(); n];
 
         let Some(first_child) = children.first() else {
@@ -122,6 +122,8 @@ impl<T> HtreeNode<T> {
 
             base_partition = key_cursor;
         }
+
+        drop(children);
 
         Ok(partitions)
     }
@@ -1131,7 +1133,7 @@ mod tests {
         let tree = make_tree(&keys, &store)?;
 
         // Get the tree's direct children to find internal boundaries
-        let children = tree.fetch_children(&store)?;
+        let children = tree.fetch_children_guard(&store)?;
         assert!(
             children.len() >= 2,
             "Need at least 2 children for this test"
@@ -1140,6 +1142,8 @@ mod tests {
         // Split exactly at a child boundary (first child's max key)
         let split_key = children[1].key;
         let parts = tree.split_many(&[split_key], &store)?;
+
+        drop(children);
 
         // Verify partitioning
         let left_keys = parts[0]
@@ -1467,8 +1471,10 @@ mod tests {
         let tree = make_tree(&keys, &store)?;
 
         // Get a child's key
-        let children = tree.fetch_children(&store)?;
+        let children = tree.fetch_children_guard(&store)?;
         let child_key = children[children.len() / 2].key;
+
+        drop(children);
 
         let parts = tree.split_many(&[child_key], &store)?;
 
@@ -1506,11 +1512,13 @@ mod tests {
         let tree = make_tree(&keys, &store)?;
 
         // Get several child keys
-        let children = tree.fetch_children(&store)?;
+        let children = tree.fetch_children_guard(&store)?;
         assert!(children.len() >= 3);
 
         let split_keys: Vec<UUID> = children.iter().take(3).map(|c| c.key).collect();
         let parts = tree.split_many(&split_keys, &store)?;
+
+        drop(children);
 
         assert_eq!(parts.len(), 4);
         assert_partition_boundaries(&parts, &split_keys, &store)?;

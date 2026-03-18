@@ -54,7 +54,7 @@ impl<S: Store, T> Iterator for HtreeNodeIterLeaves<'_, T, S> {
             // so leftmost ends up at front
             let mut fetch_err = None;
 
-            match node.fetch_children(self.store) {
+            match node.iter_children(self.store) {
                 Ok(children) => {
                     for child in children.into_iter().rev() {
                         self.queue.push_front(child);
@@ -92,7 +92,7 @@ impl<S: Store, T> DoubleEndedIterator for HtreeNodeIterLeaves<'_, T, S> {
             // so rightmost ends up at back
             let mut fetch_err = None;
 
-            match node.fetch_children(self.store) {
+            match node.iter_children(self.store) {
                 Ok(children) => {
                     for child in children {
                         self.queue.push_back(child);
@@ -125,12 +125,12 @@ pub enum HtreeNodeIterLeavesError<S: Store> {
     UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
 }
 
-impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeIterLeavesError<S> {
-    fn from(value: crate::HtreeNodeFetchChildrenError<S>) -> Self {
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeIterLeavesError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
         match value {
-            crate::HtreeNodeFetchChildrenError::CorruptedState => Self::CorruptedState,
-            crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
-            crate::HtreeNodeFetchChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }

@@ -184,8 +184,8 @@ mod tests {
 
     fn count_children(parent: &HtreeNode<u64>, store: &InMemoryStore) -> usize {
         parent
-            .fetch_children(store)
-            .expect("fetch_children should succeed")
+            .fetch_children_guard(store)
+            .expect("fetch_children_guard should succeed")
             .len()
     }
 
@@ -220,8 +220,8 @@ mod tests {
 
         for (idx, parent) in parents.iter().enumerate() {
             for child in parent
-                .fetch_children(store)
-                .expect("fetch_children should succeed")
+                .iter_children(store)
+                .expect("iter_children should succeed")
             {
                 key_ranges
                     .entry(child.key)
@@ -233,8 +233,8 @@ mod tests {
         // Verify each key only appears in its declared range
         for (idx, parent) in parents.iter().enumerate() {
             for child in parent
-                .fetch_children(store)
-                .expect("fetch_children should succeed")
+                .iter_children(store)
+                .expect("iter_children should succeed")
             {
                 let (start, end) = key_ranges[&child.key];
                 assert!(
@@ -252,8 +252,8 @@ mod tests {
         let mut key_to_parent: HashMap<UUID, usize> = HashMap::new();
         for (idx, parent) in parents.iter().enumerate() {
             for child in parent
-                .fetch_children(store)
-                .expect("fetch_children should succeed")
+                .iter_children(store)
+                .expect("iter_children should succeed")
             {
                 if let Some(&prev_idx) = key_to_parent.get(&child.key) {
                     assert_eq!(
@@ -731,8 +731,8 @@ mod tests {
         let mut actual_key_counts: HashMap<UUID, usize> = HashMap::new();
         for parent in &parents {
             for child in parent
-                .fetch_children(&store)
-                .expect("fetch_children should succeed")
+                .iter_children(&store)
+                .expect("iter_children should succeed")
             {
                 *actual_key_counts.entry(child.key).or_insert(0) += 1;
             }
@@ -787,8 +787,8 @@ mod tests {
 
         for parent in &parents {
             let children = parent
-                .fetch_children(&store)
-                .expect("fetch_children should succeed");
+                .fetch_children_guard(&store)
+                .expect("fetch_children_guard should succeed");
             for i in 1..children.len() {
                 assert!(
                     children[i - 1].key <= children[i].key,
@@ -797,6 +797,7 @@ mod tests {
                     children[i].key
                 );
             }
+            drop(children);
         }
     }
 
@@ -1594,10 +1595,9 @@ mod tests {
             .expect("from_many_children should succeed");
 
         for parent in &parents {
-            let children = parent
-                .fetch_children(&store)
-                .expect("fetch_children should succeed");
-            let min_child_key = children
+            let min_child_key = parent
+                .fetch_children_guard(&store)
+                .expect("fetch_children_guard should succeed")
                 .iter()
                 .map(|c| c.key)
                 .min()
@@ -1964,8 +1964,8 @@ mod tests {
         let mut all_values: Vec<u64> = Vec::new();
         for parent in &parents {
             for child in parent
-                .fetch_children(&store)
-                .expect("fetch_children should succeed")
+                .iter_children(&store)
+                .expect("iter_children should succeed")
             {
                 // Extract value by re-fetching
                 all_values.push(u64::from(child.key.as_bytes()[0])); // Using key as proxy
@@ -2345,14 +2345,15 @@ mod tests {
 
         // Verify the subtrees are passed through with same hkeys
         let children = parents[0]
-            .fetch_children(&store)
-            .expect("fetch_children should succeed");
+            .fetch_children_guard(&store)
+            .expect("fetch_children_guard should succeed");
         assert_eq!(children.len(), 3);
 
         // The hkeys should be unchanged - subtrees were not reconstructed
         assert!(children.iter().any(|c| c.hkey == hkey1));
         assert!(children.iter().any(|c| c.hkey == hkey2));
         assert!(children.iter().any(|c| c.hkey == hkey3));
+        drop(children);
     }
 
     #[test]
@@ -2390,8 +2391,8 @@ mod tests {
         let mut result_hkeys = Vec::new();
         for parent in &parents {
             for child in parent
-                .fetch_children(&store)
-                .expect("fetch_children should succeed")
+                .iter_children(&store)
+                .expect("iter_children should succeed")
             {
                 result_hkeys.push(child.hkey.clone());
             }
@@ -2438,21 +2439,22 @@ mod tests {
 
         // Fetch the subtrees from the parent
         let children = parents[0]
-            .fetch_children(&store)
-            .expect("fetch_children should succeed");
+            .fetch_children_guard(&store)
+            .expect("fetch_children_guard should succeed");
         assert_eq!(children.len(), 2);
 
         // Verify we can still traverse into the subtrees and get the original leaves
         let mut all_leaf_keys: Vec<UUID> = Vec::new();
-        for subtree in &children {
+        for subtree in children.iter() {
             assert_eq!(subtree.height, 1); // Subtrees should be height 1
-            let leaves = subtree
-                .fetch_children(&store)
-                .expect("fetch_children should succeed");
-            for leaf in leaves {
+            for leaf in subtree
+                .iter_children(&store)
+                .expect("iter_children should succeed")
+            {
                 all_leaf_keys.push(leaf.key);
             }
         }
+        drop(children);
 
         // Should have 4 leaves total
         assert_eq!(all_leaf_keys.len(), 4);
@@ -2497,13 +2499,14 @@ mod tests {
 
         // Verify keys are not split
         let children = parents[0]
-            .fetch_children(&store)
-            .expect("fetch_children should succeed");
+            .fetch_children_guard(&store)
+            .expect("fetch_children_guard should succeed");
         assert_eq!(children.len(), 7);
 
         // Count subtrees per key
         let key0_count = children.iter().filter(|c| c.key == keys[0]).count();
         let key1_count = children.iter().filter(|c| c.key == keys[1]).count();
+        drop(children);
         assert_eq!(key0_count, 5);
         assert_eq!(key1_count, 2);
     }

@@ -44,18 +44,20 @@ impl<T> HtreeNode<T> {
                 }
             }
 
-            for child in self.fetch_children(store)? {
-                if !keys.contains(&child.key) {
-                    leaves.push(child);
-                }
+            for child in self
+                .fetch_children_guard(store)?
+                .iter()
+                .filter(|child| !keys.contains(&child.key))
+                .cloned()
+            {
+                leaves.push(child);
             }
 
             return Self::from_many_children(leaves, store).map_err(Into::into);
         }
 
         let mut groups: Vec<(Self, Vec<Self>)> = self
-            .fetch_children(store)?
-            .into_iter()
+            .iter_children(store)?
             .map(|child| (child, vec![]))
             .collect();
 
@@ -117,6 +119,16 @@ impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeUpsertLe
             crate::HtreeNodeFetchChildrenError::CorruptedState => Self::CorruptedNode,
             crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
             crate::HtreeNodeFetchChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+        }
+    }
+}
+
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeUpsertLeavesError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
+        match value {
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedNode,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }

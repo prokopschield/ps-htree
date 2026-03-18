@@ -50,7 +50,7 @@ fn default_tree_is_empty_leaf_with_height_zero() {
     assert!(tree.is_leaf());
     assert_eq!(tree.height(), 0);
     assert!(
-        tree.fetch_children(&store)
+        tree.fetch_children_guard(&store)
             .expect("expected success")
             .is_empty()
     );
@@ -92,11 +92,15 @@ fn from_children_sorts_children_and_increments_height() {
         .map(|(k, v)| HtreeNode::from_kvp(k, v, &store).expect("expected success"))
         .collect();
     let parent = HtreeNode::from_children(children, &store).expect("expected success");
-    let fetched = parent.fetch_children(&store).expect("expected success");
+    let fetched = parent
+        .fetch_children_guard(&store)
+        .expect("expected success");
+    let is_sorted = fetched.windows(2).all(|pair| pair[0].key <= pair[1].key);
+    drop(fetched);
 
     assert_eq!(parent.height(), 1);
     assert!(!parent.is_leaf());
-    assert!(fetched.windows(2).all(|pair| pair[0].key <= pair[1].key));
+    assert!(is_sorted);
 }
 
 #[test]
@@ -479,11 +483,16 @@ fn wrapped_child_can_resolve_to_its_children() {
     let raw = root.hkey.resolve(&store).expect("expected success");
     let unpacked_children = HtreeNode::<u64>::unpack_children(&raw).expect("expected success");
     let wrapped = unpacked_children.first().expect("expected success");
-    let resolved = wrapped.fetch_children(&store).expect("expected success");
+    let resolved = wrapped
+        .fetch_children_guard(&store)
+        .expect("expected success");
+    let len = resolved.len();
+    let all_leaves = resolved.iter().all(ps_htree::HtreeNode::is_leaf);
+    drop(resolved);
 
     assert_eq!(wrapped.height(), 1);
-    assert_eq!(resolved.len(), 2);
-    assert!(resolved.iter().all(ps_htree::HtreeNode::is_leaf));
+    assert_eq!(len, 2);
+    assert!(all_leaves);
 }
 
 #[test]
@@ -563,7 +572,9 @@ fn resolve_on_leaf_is_noop() {
     leaf.resolve(&store).expect("expected success");
     assert!(leaf.is_leaf());
     assert_eq!(
-        leaf.fetch_children(&store).expect("expected success").len(),
+        leaf.fetch_children_guard(&store)
+            .expect("expected success")
+            .len(),
         0
     );
 }

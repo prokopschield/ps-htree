@@ -25,6 +25,7 @@ impl<T> HtreeNode<T> {
     /// - [`HtreeNodeUpdateLeavesError::KeyNotFound`] is returned if you're updating a record that doesn't exist.
     /// - [`HtreeNodeUpdateLeavesError::Store`] is returned if store operations fail.
     /// - [`HtreeNodeUpdateLeavesError::UnpackChildren`] is returned if child deserialization fails.
+    #[allow(clippy::significant_drop_tightening)]
     pub fn update_leaves<I: IntoIterator<Item = Self>, S: Store>(
         &self,
         children: I,
@@ -49,7 +50,7 @@ impl<T> HtreeNode<T> {
         }
 
         if self.height <= LEAF_HEIGHT + 1 {
-            let current_leaves = self.fetch_children(store)?;
+            let current_leaves = self.fetch_children_guard(store)?;
 
             let current_keys: HashSet<UUID> = current_leaves.iter().map(|leaf| leaf.key).collect();
             let updated_keys: HashSet<UUID> = updated_leaves.iter().map(|leaf| leaf.key).collect();
@@ -59,16 +60,16 @@ impl<T> HtreeNode<T> {
             }
 
             let merged = current_leaves
-                .into_iter()
+                .iter()
                 .filter(|leaf| !updated_keys.contains(&leaf.key))
+                .cloned()
                 .chain(updated_leaves);
 
             return Ok(Self::from_many_children(merged, store)?);
         }
 
         let mut groups: Vec<(Self, Vec<Self>)> = self
-            .fetch_children(store)?
-            .into_iter()
+            .iter_children(store)?
             .map(|child| (child, vec![]))
             .collect();
 
@@ -126,6 +127,16 @@ impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodeUpdateLe
             crate::HtreeNodeFetchChildrenError::CorruptedState => Self::CorruptedNode,
             crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
             crate::HtreeNodeFetchChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
+        }
+    }
+}
+
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodeUpdateLeavesError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
+        match value {
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedNode,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }
