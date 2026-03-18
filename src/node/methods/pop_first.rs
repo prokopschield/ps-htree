@@ -1,5 +1,3 @@
-use std::iter::once;
-
 use ps_hkey::Store;
 
 use crate::HtreeNode;
@@ -10,8 +8,8 @@ use crate::HtreeNode;
 pub struct PopResult<T> {
     /// The popped node, or `None` if the tree was empty.
     pub popped: Option<HtreeNode<T>>,
-    /// The remaining tree after the pop (empty if nothing remains).
-    pub remaining: HtreeNode<T>,
+    /// The remaining tree after the pop, or `None` when the tree is empty.
+    pub remaining: Option<HtreeNode<T>>,
 }
 
 impl<T> HtreeNode<T> {
@@ -32,13 +30,14 @@ impl<T> HtreeNode<T> {
     ///
     /// Returns a [`PopResult`] with:
     /// - `popped`: The removed leaf, or `None` if the tree was empty
-    /// - `remaining`: The tree after removal (empty if nothing remains)
+    /// - `remaining`: The tree after removal (`None` if nothing remains)
     ///
     /// # Errors
     ///
-    /// - [`HtreeNodePopFirstError::FetchChildren`] if children cannot be fetched during traversal.
+    /// - [`HtreeNodePopFirstError::CorruptedState`] if stored tree structure is invalid.
     /// - [`HtreeNodePopFirstError::FromChildren`] if tree reconstruction fails.
     /// - [`HtreeNodePopFirstError::Store`] if store operations fail.
+    /// - [`HtreeNodePopFirstError::UnpackChildren`] if child payload decoding fails.
     ///
     /// # Examples
     ///
@@ -51,7 +50,9 @@ impl<T> HtreeNode<T> {
     ///
     /// // Empty tree returns None
     /// let empty: HtreeNode<u64> = HtreeNode::default();
-    /// assert!(empty.pop_first(&store).unwrap().popped.is_none());
+    /// let result = empty.pop_first(&store).unwrap();
+    /// assert!(result.popped.is_none());
+    /// assert!(result.remaining.is_none());
     ///
     /// // Tree with entries returns the minimum
     /// let key1 = UUID::gen_v4().with_version(8);
@@ -68,21 +69,22 @@ impl<T> HtreeNode<T> {
     ///
     /// let result = tree.pop_first(&store).unwrap();
     /// let popped = result.popped.unwrap();
+    /// let remaining = result.remaining.unwrap();
     /// assert_eq!(popped.key, min_key);
-    /// assert!(result.remaining.find_one(&min_key, &store).unwrap().is_none());
+    /// assert!(remaining.find_one(&min_key, &store).unwrap().is_none());
     /// ```
     pub fn pop_first<S: Store>(self, store: &S) -> Result<PopResult<T>, HtreeNodePopFirstError<S>> {
         if self.is_empty() {
             return Ok(PopResult {
                 popped: None,
-                remaining: Self::default(),
+                remaining: None,
             });
         }
 
         if self.is_leaf() {
             return Ok(PopResult {
                 popped: Some(self),
-                remaining: Self::default(),
+                remaining: None,
             });
         }
 
@@ -93,8 +95,7 @@ impl<T> HtreeNode<T> {
         self,
         store: &S,
     ) -> Result<PopResult<T>, HtreeNodePopFirstError<S>> {
-        let children = self.fetch_children(store)?;
-        let mut iter = children.into_iter();
+        let mut iter = self.iter_children(store)?;
 
         while let Some(first_child) = iter.next() {
             let PopResult { popped, remaining } = first_child.pop_first(store)?;
@@ -104,11 +105,14 @@ impl<T> HtreeNode<T> {
             };
 
             let remaining = Self::from_children(
-                once(remaining)
+                remaining
+                    .into_iter()
                     .chain(iter)
                     .filter(|child| !child.is_empty()),
                 store,
             )?;
+
+            let remaining = (!remaining.is_empty()).then_some(remaining);
 
             return Ok(PopResult {
                 popped: Some(popped),
@@ -118,28 +122,32 @@ impl<T> HtreeNode<T> {
 
         Ok(PopResult {
             popped: None,
-            remaining: Self::default(),
+            remaining: None,
         })
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum HtreeNodePopFirstError<S: Store> {
-    #[error(transparent)]
-    FetchChildren(crate::HtreeNodeFetchChildrenError<S>),
+    #[error("HtreeNode's state is internally corrupted.")]
+    CorruptedState,
 
     #[error(transparent)]
     FromChildren(crate::HtreeNodeFromChildrenError<S>),
 
     #[error("Store error: {0}")]
     Store(S::Error),
+
+    #[error(transparent)]
+    UnpackChildren(#[from] crate::HtreeNodeUnpackChildrenError),
 }
 
-impl<S: Store> From<crate::HtreeNodeFetchChildrenError<S>> for HtreeNodePopFirstError<S> {
-    fn from(value: crate::HtreeNodeFetchChildrenError<S>) -> Self {
+impl<S: Store> From<crate::HtreeNodeIterChildrenError<S>> for HtreeNodePopFirstError<S> {
+    fn from(value: crate::HtreeNodeIterChildrenError<S>) -> Self {
         match value {
-            crate::HtreeNodeFetchChildrenError::Store(err) => Self::Store(err),
-            err => Self::FetchChildren(err),
+            crate::HtreeNodeIterChildrenError::CorruptedState => Self::CorruptedState,
+            crate::HtreeNodeIterChildrenError::Store(err) => Self::Store(err),
+            crate::HtreeNodeIterChildrenError::UnpackChildren(err) => Self::UnpackChildren(err),
         }
     }
 }
@@ -171,7 +179,7 @@ mod tests {
             .expect("pop_first should not fail on empty tree");
 
         assert!(result.popped.is_none());
-        assert!(result.remaining.is_empty());
+        assert!(result.remaining.is_none());
     }
 
     #[test]
@@ -190,7 +198,7 @@ mod tests {
         let popped = result.popped.expect("popped should be Some");
         assert_eq!(popped.key, key);
         assert!(popped.is_leaf());
-        assert!(result.remaining.is_empty());
+        assert!(result.remaining.is_none());
     }
 
     #[test]
@@ -218,19 +226,20 @@ mod tests {
         let popped = result.popped.expect("popped should be Some");
         assert_eq!(popped.key, min_key);
         assert!(popped.is_leaf());
+        let remaining = result
+            .remaining
+            .expect("remaining should contain the larger leaf");
 
         // The larger key should still be in the tree
         assert!(
-            result
-                .remaining
+            remaining
                 .find_one(&max_key, &store)
                 .expect("find_one should succeed")
                 .is_some()
         );
         // The smaller key should be gone
         assert!(
-            result
-                .remaining
+            remaining
                 .find_one(&min_key, &store)
                 .expect("find_one should succeed")
                 .is_none()
@@ -265,11 +274,13 @@ mod tests {
         let popped = result.popped.expect("popped should be Some");
         assert_eq!(popped.key, min_key);
         assert!(popped.is_leaf());
+        let remaining = result
+            .remaining
+            .expect("remaining should contain all non-popped leaves");
 
         // The minimum key should no longer be in the tree
         assert!(
-            result
-                .remaining
+            remaining
                 .find_one(&min_key, &store)
                 .expect("find_one should succeed")
                 .is_none()
@@ -278,8 +289,7 @@ mod tests {
         // All other keys should still be present
         for key in keys.iter().filter(|&&k| k != min_key) {
             assert!(
-                result
-                    .remaining
+                remaining
                     .find_one(key, &store)
                     .expect("find_one should succeed")
                     .is_some()
@@ -313,7 +323,7 @@ mod tests {
             let result = tree.pop_first(&store).expect("pop_first should succeed");
             let popped = result.popped.expect("popped should be Some");
             assert_eq!(popped.key, *expected_key);
-            tree = result.remaining;
+            tree = result.remaining.unwrap_or_default();
         }
 
         // Tree should now be empty
@@ -345,7 +355,7 @@ mod tests {
                 .expect("pop_first should succeed on deep tree");
             let popped = result.popped.expect("popped should be Some");
             assert_eq!(popped.key, expected_key);
-            tree = result.remaining;
+            tree = result.remaining.unwrap_or_default();
         }
 
         assert!(tree.is_empty());
@@ -382,11 +392,13 @@ mod tests {
         assert!(popped.is_leaf());
         // The popped leaf should have the same hkey as the original
         assert_eq!(popped.hkey, leaf1.hkey);
+        let remaining = result
+            .remaining
+            .expect("remaining should contain the larger leaf");
 
         // Verify remaining entry
         assert!(
-            result
-                .remaining
+            remaining
                 .find_one(&larger_key, &store)
                 .expect("find_one should succeed")
                 .is_some()
