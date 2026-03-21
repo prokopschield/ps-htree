@@ -57,6 +57,26 @@ impl<T> HtreeNode<T> {
 
         build_parent_from_sorted_children(children, store)
     }
+
+    /// Like [`from_sorted_children`](Self::from_sorted_children), but first
+    /// checks whether `self`'s current children match the provided ones.
+    /// If they do, returns `Ok(self.clone())` without rebuilding.
+    pub(crate) fn with_or_from_sorted_children<S>(
+        &self,
+        children: Vec<Self>,
+        store: &S,
+    ) -> Result<Self, HtreeNodeFromChildrenError<S>>
+    where
+        S: Store,
+    {
+        if let Ok(guard) = self.fetch_children_guard(store)
+            && *guard == *children
+        {
+            return Ok(self.clone());
+        }
+
+        build_parent_from_sorted_children(children, store)
+    }
 }
 
 fn build_parent_from_sorted_children<T, S: Store>(
