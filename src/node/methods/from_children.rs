@@ -58,18 +58,6 @@ impl<T> HtreeNode<T> {
         build_parent_from_sorted_children(children, store)
     }
 
-    /// Like [`from_sorted_children`](Self::from_sorted_children),
-    /// but accepts a pre-collected `Vec`, skipping the `collect` step.
-    pub(crate) fn from_sorted_children_vec<S>(
-        children: Vec<Self>,
-        store: &S,
-    ) -> Result<Self, HtreeNodeFromChildrenError<S>>
-    where
-        S: Store,
-    {
-        build_parent_from_sorted_children(children, store)
-    }
-
     /// Like [`from_sorted_children`](Self::from_sorted_children), but first
     /// checks whether `self`'s current children match the provided ones.
     /// If they do, returns `Ok(self.clone())` without rebuilding.
